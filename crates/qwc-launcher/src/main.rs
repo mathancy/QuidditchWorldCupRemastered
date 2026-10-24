@@ -1,6 +1,7 @@
 //! `qwc-launcher`: the remaster's launcher window, or with a command its setup's steps without one:
 //! - `check-exe FILE`: what an exe is (verified, readable, copy-protected, not the game's);
 //! - `check-game DIR`: a game folder against the known editions;
+//!   both exit with 3 when the setup cannot use it (the installer's setup pages ask them);
 //! - `import EXE DIR`: both checked, then imported into the library (`$QWC_LIBRARY` elsewhere) and the profile
 //!   pointed at them;
 //! - `hashes DIR ID NAME`: an edition list of a game folder (`editions/*.txt`), printed;
@@ -43,6 +44,9 @@ fn main() {
         ["check-exe", file] => {
             let c = setup::check_exe(Path::new(file));
             println!("{}  sha256 {}  {} load sets", c.verdict.message(), c.sha256, c.loadsets);
+            if !c.verdict.usable() {
+                std::process::exit(3)
+            }
         }
         ["check-game", dir] => {
             let c = setup::check_game(Path::new(dir), &Progress::default()).unwrap_or_else(|e| fail(e));
@@ -51,6 +55,9 @@ fn main() {
                 for f in list {
                     println!("  {what}: {f}");
                 }
+            }
+            if !c.importable() {
+                std::process::exit(3)
             }
         }
         ["import", exe, dir] => {

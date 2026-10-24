@@ -78,8 +78,9 @@ Download the latest release from the [Releases page](https://github.com/mathancy
   and offers a desktop shortcut and Start menu entries.
 - **Linux:** run the `.AppImage`, or unpack the `.tar.gz` and run `qwc-launcher`.
 
-On first start the launcher asks for your game folder and your no-CD exe, checks them and imports what it needs.
-Your library (the imported game, packs, settings and save backups) lives in your user profile
+The Windows installer sets up your game as part of the installation: it asks for your game folder and your
+no-CD `QWC.exe`, checks both, and imports the files the remaster reads. You can also choose to do this later, and
+on Linux the launcher asks on its first start. Your library (the imported game, packs, settings and save backups) lives in your user profile
 (`%APPDATA%\QWCRemastered` on Windows, `~/.local/share/qwc-remastered` on Linux) and is kept when you update or
 uninstall. The launcher checks this repository's releases for updates.
 

@@ -42,6 +42,12 @@ The remaster is, in essence, a modding tool. It ships no game content of its own
 game you already own, a launcher that manages it, and the tools to make packs for it. Everything you see in a match
 comes from your copy of the game, or from packs you choose to install.
 
+### Made with AI
+
+To be transparent: **AI was used heavily in the development of this project.** Much of the reverse engineering,
+the Rust code, the tooling and the documentation was written with AI assistance (Anthropic's Claude, through
+Claude Code), directed, tested and reviewed by the maintainer.
+
 ## What's in it
 
 - **The launcher**

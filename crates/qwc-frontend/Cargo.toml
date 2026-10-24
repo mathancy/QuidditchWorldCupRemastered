@@ -1,0 +1,17 @@
+[package]
+name = "qwc-frontend"
+version.workspace = true
+description = "The front end's session without a GPU: the screen scripts and their flow over the game data, the textures and fonts they see, and the remaster's layout changes to their screens"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+qwc-anim = { path = "../qwc-anim" }
+qwc-assets = { path = "../qwc-assets" }
+qwc-feck = { path = "../qwc-feck" }
+qwc-formats = { path = "../qwc-formats" }
+qwc-packs = { path = "../qwc-packs" }
+qwc-text = { path = "../qwc-text" }
+serde = { version = "1", features = ["derive"] }
+ron = "0.12"

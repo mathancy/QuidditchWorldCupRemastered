@@ -1,0 +1,11 @@
+[package]
+name = "qwc-hud"
+version.workspace = true
+description = "The HUD's layouts: anchored elements on a canvas that scales to any screen, driven by the game's values"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+ron = "0.12"

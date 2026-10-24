@@ -1,0 +1,21 @@
+# Rust
+/target/
+
+# The player's own files, never committed: the game's data, resource packs and anything made from the game's data
+# (texture packs, movies, layouts) stay on each player's machine. The vector fonts are the one part of remastered/
+# that ships.
+/original/
+/analysis/
+/extracted/
+/converted/
+/work/
+/remastered/*
+!/remastered/fonts/
+!/remastered/fonts.txt
+
+# Python
+__pycache__/
+*.pyc
+
+# SafeDisc shim logs written next to a no-CD exe
+*_SafeDiscShim.log

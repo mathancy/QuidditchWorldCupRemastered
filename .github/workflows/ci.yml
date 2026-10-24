@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Code and docs only: the game data under original/ is not needed for the unit tests. docs/ (in the private
+      # repo only) is there for the test that checks docs/feck_natives.md against the port.
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            crates
+            docs
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      # cpal (qwc-audio playback) links against ALSA on Linux; NASM builds OpenH264's assembly (qwc-video).
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev nasm
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test

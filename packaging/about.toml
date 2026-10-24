@@ -1,0 +1,28 @@
+# cargo-about (`packaging/stage.py --notices`, `docs/RELEASING.md`): the licences of every crate the release's
+# programs link, gathered into THIRD-PARTY-LICENSES.html. A crate under a licence not listed here stops the release
+# until it is looked at and added.
+accepted = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "0BSD",
+    "ISC",
+    "Zlib",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "BSL-1.0",
+    "CC0-1.0",
+    "Unlicense",
+    "CDLA-Permissive-2.0",
+    # egui's default fonts (epaint_default_fonts)
+    "OFL-1.1",
+    "Ubuntu-font-1.0",
+]
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+# the remaster's own crates (GPL-3.0-or-later, LICENSE)
+private = { ignore = true }

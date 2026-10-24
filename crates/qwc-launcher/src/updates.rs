@@ -1,0 +1,215 @@
+//! News and updates: the remaster's releases on GitHub (the public repository's Releases, `docs/LAUNCHER.md`), the
+//! newest one checked against this version, its installer for this platform downloaded and checked against the
+//! release's `SHA256SUMS`.
+//!
+//! A release is tagged `vX.Y.Z` and carries `QWCRemastered-X.Y.Z-setup.exe` (Windows),
+//! `QWCRemastered-X.Y.Z-x86_64.AppImage` (Linux) and `SHA256SUMS` (`sha256sum`'s format), as the release pipeline
+//! makes them (milestone 6).
+
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::Ordering;
+
+use serde::Deserialize;
+use sha2::{Digest, Sha256};
+
+use crate::setup::Progress;
+
+/// The releases' address: `$QWC_RELEASES_URL`, else the public repository's.
+pub fn releases_url() -> String {
+    std::env::var("QWC_RELEASES_URL").unwrap_or_else(|_| {
+        "https://api.github.com/repos/mathancy/QuidditchWorldCupRemastered/releases?per_page=10".into()
+    })
+}
+
+/// This launcher's version.
+pub fn current() -> semver::Version {
+    semver::Version::parse(env!("CARGO_PKG_VERSION")).expect("the crate's own version")
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct Asset {
+    pub name: String,
+    #[serde(rename = "browser_download_url")]
+    pub url: String,
+    #[serde(default)]
+    pub size: u64,
+}
+
+/// A release as GitHub's API gives it.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct Release {
+    pub tag_name: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub body: Option<String>,
+    #[serde(default)]
+    pub published_at: Option<String>,
+    #[serde(default)]
+    pub prerelease: bool,
+    #[serde(default)]
+    pub draft: bool,
+    #[serde(default)]
+    pub assets: Vec<Asset>,
+}
+
+impl Release {
+    /// Its version, from the tag (`v0.2.0`); none for a tag that is not one.
+    pub fn version(&self) -> Option<semver::Version> {
+        semver::Version::parse(self.tag_name.trim_start_matches('v')).ok()
+    }
+
+    pub fn title(&self) -> String {
+        self.name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| self.tag_name.clone())
+    }
+
+    /// The day it came out (`2026-10-23`).
+    pub fn date(&self) -> &str {
+        self.published_at.as_deref().map_or("", |d| d.get(..10).unwrap_or(d))
+    }
+
+    /// The installer for this platform: the Windows setup or the Linux AppImage.
+    pub fn installer(&self) -> Option<&Asset> {
+        let wanted = if cfg!(windows) { "-setup.exe" } else { ".appimage" };
+        self.assets.iter().find(|a| a.name.to_ascii_lowercase().ends_with(wanted))
+    }
+}
+
+/// The releases in GitHub's JSON, the newest first, drafts left out.
+pub fn parse(json: &str) -> Result<Vec<Release>, String> {
+    let mut r: Vec<Release> = serde_json::from_str(json).map_err(|e| format!("the releases do not read: {e}"))?;
+    r.retain(|x| !x.draft);
+    r.sort_by_key(|x| std::cmp::Reverse(x.version()));
+    Ok(r)
+}
+
+/// The newest full release past `than`, if any.
+pub fn newer<'a>(releases: &'a [Release], than: &semver::Version) -> Option<&'a Release> {
+    releases
+        .iter()
+        .filter(|r| !r.prerelease)
+        .filter(|r| r.version().is_some_and(|v| &v > than))
+        .max_by_key(|r| r.version())
+}
+
+/// `SHA256SUMS` (`<hex>  <name>` lines) by file name.
+pub fn checksums(text: &str) -> HashMap<String, String> {
+    text.lines()
+        .filter_map(|l| {
+            let (sha, name) = l.trim().split_once(char::is_whitespace)?;
+            let name = name.trim().trim_start_matches('*');
+            (sha.len() == 64).then(|| (name.to_string(), sha.to_ascii_lowercase()))
+        })
+        .collect()
+}
+
+fn agent() -> ureq::Agent {
+    ureq::Agent::config_builder()
+        .timeout_global(Some(std::time::Duration::from_secs(30)))
+        .user_agent(concat!("qwc-launcher/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .into()
+}
+
+/// The releases, fetched.
+pub fn fetch(url: &str) -> Result<Vec<Release>, String> {
+    let mut res = agent().get(url).header("Accept", "application/vnd.github+json").call().map_err(|e| match e {
+        ureq::Error::StatusCode(404) => "No releases are published yet.".to_string(),
+        e => format!("Could not reach the releases: {e}"),
+    })?;
+    let text = res.body_mut().read_to_string().map_err(|e| e.to_string())?;
+    parse(&text)
+}
+
+/// Download `release`'s installer into `dir`, checked against its `SHA256SUMS`; answers the file.
+pub fn download(release: &Release, dir: &Path, progress: &Progress) -> Result<PathBuf, String> {
+    let asset = release.installer().ok_or("this release has no installer for this system")?;
+    let sums = release.assets.iter().find(|a| a.name == "SHA256SUMS").ok_or("this release has no SHA256SUMS")?;
+    let agent = agent();
+    let text = agent
+        .get(&sums.url)
+        .call()
+        .map_err(|e| e.to_string())?
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| e.to_string())?;
+    let want =
+        checksums(&text).remove(&asset.name).ok_or_else(|| format!("SHA256SUMS does not list {}", asset.name))?;
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let file = dir.join(&asset.name);
+    let part = dir.join(format!("{}.part", asset.name));
+    let mut res = agent.get(&asset.url).call().map_err(|e| e.to_string())?;
+    progress.total.store(asset.size, Ordering::Relaxed);
+    progress.done.store(0, Ordering::Relaxed);
+    let mut body = res.body_mut().with_config().limit(4 << 30).reader();
+    let mut out = std::fs::File::create(&part).map_err(|e| format!("{}: {e}", part.display()))?;
+    let (mut h, mut buf) = (Sha256::new(), vec![0u8; 1 << 16]);
+    loop {
+        let n = body.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        h.update(&buf[..n]);
+        out.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+        progress.done.fetch_add(n as u64, Ordering::Relaxed);
+        if progress.cancel.load(Ordering::Relaxed) {
+            drop(out);
+            let _ = std::fs::remove_file(&part);
+            return Err("stopped".into());
+        }
+    }
+    drop(out);
+    let got: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    if got != want {
+        let _ = std::fs::remove_file(&part);
+        return Err(format!("{} does not match its checksum: not installed", asset.name));
+    }
+    std::fs::rename(&part, &file).map_err(|e| format!("{}: {e}", file.display()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755));
+    }
+    Ok(file)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const JSON: &str = r#"[
+        {"tag_name": "v0.3.0-beta.1", "prerelease": true, "assets": []},
+        {"tag_name": "v0.1.0", "name": "First", "published_at": "2026-11-01T10:00:00Z", "body": "Hello", "assets": []},
+        {"tag_name": "v0.2.0", "name": "", "published_at": "2026-12-01T10:00:00Z", "body": "More",
+         "assets": [{"name": "QWCRemastered-0.2.0-setup.exe", "browser_download_url": "https://x/setup.exe", "size": 9},
+                    {"name": "QWCRemastered-0.2.0-x86_64.AppImage", "browser_download_url": "https://x/app", "size": 8},
+                    {"name": "SHA256SUMS", "browser_download_url": "https://x/sums", "size": 1}]},
+        {"tag_name": "v9.9.9", "draft": true, "assets": []}
+    ]"#;
+
+    #[test]
+    fn releases_newest_first_and_the_newer_one() {
+        let r = parse(JSON).unwrap();
+        let tags: Vec<&str> = r.iter().map(|x| x.tag_name.as_str()).collect();
+        assert_eq!(tags, ["v0.3.0-beta.1", "v0.2.0", "v0.1.0"], "drafts left out");
+        let v = |s: &str| semver::Version::parse(s).unwrap();
+        assert_eq!(newer(&r, &v("0.1.0")).map(|x| x.tag_name.as_str()), Some("v0.2.0"), "a beta is not offered");
+        assert_eq!(newer(&r, &v("0.2.0")), None);
+        assert_eq!(r[1].title(), "v0.2.0");
+        assert_eq!((r[2].title().as_str(), r[2].date()), ("First", "2026-11-01"));
+        let installer = r[1].installer().unwrap();
+        assert!(installer.name.ends_with(if cfg!(windows) { "setup.exe" } else { "AppImage" }));
+        assert!(parse("{").is_err());
+    }
+
+    #[test]
+    fn checksum_lists() {
+        let a = "a".repeat(64);
+        let sums = checksums(&format!("{a}  QWCRemastered-0.2.0-setup.exe\n{a} *binary.AppImage\nnot a line\n"));
+        assert_eq!(sums.get("QWCRemastered-0.2.0-setup.exe"), Some(&a));
+        assert_eq!(sums.get("binary.AppImage"), Some(&a));
+        assert_eq!(sums.len(), 2);
+    }
+}

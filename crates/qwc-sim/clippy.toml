@@ -1,0 +1,23 @@
+# Online play needs every platform to compute the same bits: the sines, cosines and exponentials go through
+# `crate::fmath` (libm), never the system C library the standard library calls.
+disallowed-methods = [
+    { path = "f64::sin", reason = "use crate::fmath::sin (the same bits on every platform)" },
+    { path = "f64::cos", reason = "use crate::fmath::cos (the same bits on every platform)" },
+    { path = "f64::sin_cos", reason = "use crate::fmath::sin_cos (the same bits on every platform)" },
+    { path = "f64::tan", reason = "add it to crate::fmath (the same bits on every platform)" },
+    { path = "f64::acos", reason = "use crate::fmath::acos (the same bits on every platform)" },
+    { path = "f64::asin", reason = "add it to crate::fmath (the same bits on every platform)" },
+    { path = "f64::atan", reason = "add it to crate::fmath (the same bits on every platform)" },
+    { path = "f64::atan2", reason = "add it to crate::fmath (the same bits on every platform)" },
+    { path = "f64::exp", reason = "use crate::fmath::exp (the same bits on every platform)" },
+    { path = "f64::ln", reason = "add it to crate::fmath (the same bits on every platform)" },
+    { path = "f64::powf", reason = "add it to crate::fmath (the same bits on every platform)" },
+    { path = "f64::hypot", reason = "add it to crate::fmath (the same bits on every platform)" },
+    { path = "f32::sin", reason = "use crate::fmath::sin (the same bits on every platform)" },
+    { path = "f32::cos", reason = "use crate::fmath::cos (the same bits on every platform)" },
+    { path = "f32::sin_cos", reason = "use crate::fmath::sin_cos (the same bits on every platform)" },
+    { path = "f32::acos", reason = "use crate::fmath::acos (the same bits on every platform)" },
+    { path = "f32::atan2", reason = "add it to crate::fmath (the same bits on every platform)" },
+    { path = "f32::exp", reason = "use crate::fmath::exp (the same bits on every platform)" },
+    { path = "f32::powf", reason = "add it to crate::fmath (the same bits on every platform)" },
+]

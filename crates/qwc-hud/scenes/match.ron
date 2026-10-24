@@ -1,0 +1,792 @@
+#![enable(unwrap_variant_newtypes)]
+(
+    design: (640.0, 480.0),
+    scale: ShortestSide,
+    params: [
+        (
+            name: "power.left",
+            value: Scalar(0.35),
+            range: (0.0, 1.0),
+            note: "The home team's power (its bar's fill)",
+        ),
+        (
+            name: "power.right",
+            value: Scalar(0.25),
+            range: (0.0, 1.0),
+            note: "The away team's power",
+        ),
+        (
+            name: "seeker_game",
+            value: Flag(false),
+            range: (0.0, 1.0),
+            note: "Whether the Seeker game is on (the bars met)",
+        ),
+        (
+            name: "score.left",
+            value: Scalar(40.0),
+            range: (0.0, 999.0),
+            note: "The home team's score",
+        ),
+        (
+            name: "score.right",
+            value: Scalar(10.0),
+            range: (0.0, 999.0),
+            note: "The away team's score",
+        ),
+        (
+            name: "team.left",
+            value: Text("England"),
+            range: (0.0, 1.0),
+            hint: Team,
+            note: "The home team's folder (teams/<folder>)",
+        ),
+        (
+            name: "team.right",
+            value: Text("France"),
+            range: (0.0, 1.0),
+            hint: Team,
+            note: "The away team's folder",
+        ),
+        (
+            name: "colour.left",
+            value: Colour(1.0, 1.0, 1.0, 1.0),
+            range: (0.0, 1.0),
+            hint: TeamColour("team.left"),
+            note: "The home team's colour, from its bar",
+        ),
+        (
+            name: "colour.right",
+            value: Colour(1.0, 1.0, 1.0, 1.0),
+            range: (0.0, 1.0),
+            hint: TeamColour("team.right"),
+            note: "The away team's colour",
+        ),
+        (
+            name: "cards.left",
+            value: Flag(true),
+            range: (0.0, 1.0),
+            note: "Whether the home team's moves show (a human team, outside the Seeker game)",
+        ),
+        (
+            name: "cards.right",
+            value: Flag(false),
+            range: (0.0, 1.0),
+            note: "Whether the away team's moves show",
+        ),
+        (
+            name: "card.left.0",
+            value: Text("dodge_button_active"),
+            range: (0.0, 1.0),
+            hint: Texture,
+            note: "The home dodge's card: lit when ready, else STO_buttons_empty",
+        ),
+        (
+            name: "card.left.1",
+            value: Text("STO_buttons_empty"),
+            range: (0.0, 1.0),
+            hint: Texture,
+            note: "The home Bludger move's card (bludger_button_active when ready)",
+        ),
+        (
+            name: "card.left.2",
+            value: Text("STO_buttons_empty"),
+            range: (0.0, 1.0),
+            hint: Texture,
+            note: "The home special move's card (specialmove_button_active when ready)",
+        ),
+        (
+            name: "card.right.0",
+            value: Text("STO_buttons_empty"),
+            range: (0.0, 1.0),
+            hint: Texture,
+            note: "The away dodge's card",
+        ),
+        (
+            name: "card.right.1",
+            value: Text("STO_buttons_empty"),
+            range: (0.0, 1.0),
+            hint: Texture,
+            note: "The away Bludger move's card",
+        ),
+        (
+            name: "card.right.2",
+            value: Text("STO_buttons_empty"),
+            range: (0.0, 1.0),
+            hint: Texture,
+            note: "The away special move's card",
+        ),
+        (
+            name: "race",
+            value: Flag(false),
+            range: (0.0, 1.0),
+            note: "Whether the Seeker race is on (the seekers' gauges show)",
+        ),
+        (
+            name: "seeker.left.level",
+            value: Scalar(0.6),
+            range: (0.0, 1.0),
+            note: "The home seeker's boost",
+        ),
+        (
+            name: "seeker.left.bar",
+            value: Text("seeker_power_bar_green"),
+            range: (0.0, 1.0),
+            hint: Texture,
+            note: "Its gauge's fill: seeker_power_bar_green, or _red below the minimum boost",
+        ),
+        (
+            name: "seeker.right.level",
+            value: Scalar(0.4),
+            range: (0.0, 1.0),
+            note: "The away seeker's boost",
+        ),
+        (
+            name: "seeker.right.bar",
+            value: Text("seeker_power_bar_red"),
+            range: (0.0, 1.0),
+            hint: Texture,
+            note: "Its gauge's fill",
+        ),
+        (
+            name: "seeker.appear",
+            value: Scalar(1.0),
+            range: (0.0, 1.0),
+            note: "The Seeker game's start: the power bars draw back as the gauges grow in (0 to 1)",
+        ),
+        (
+            name: "seeker.glow",
+            value: Scalar(1.0),
+            range: (0.0, 1.0),
+            note: "The bar tips' glows, fading once the bars are back",
+        ),
+    ],
+    elements: [
+        (
+            name: "Top bar",
+            kind: Group,
+            anchors: (
+                min: (0.5, 0.0),
+                max: (0.5, 0.0),
+            ),
+            position: (0.0, 0.0),
+            size: (640.0, 120.0),
+            alignment: (0.5, 0.0),
+            layer: 52,
+            children: [
+                (
+                    name: "Home",
+                    kind: Group,
+                    anchors: (
+                        min: (0.0, 0.0),
+                        max: (1.0, 1.0),
+                    ),
+                    position: (0.0, 0.0),
+                    size: (0.0, 0.0),
+                    layer: 52,
+                    children: [
+                        (
+                            name: "Box fill",
+                            kind: Image(
+                                texture: "topbar_white_alpha",
+                                uv: (0.0, 0.0, 0.5546875, 0.671875),
+                                fill: 1.0,
+                                crop: true,
+                            ),
+                            anchors: (
+                                min: (0.0, 0.0),
+                                max: (0.0, 0.0),
+                            ),
+                            position: (64.4, 47.2),
+                            size: (113.1, 38.9),
+                            layer: 50,
+                            tint: "colour.left",
+                        ),
+                        (
+                            name: "Box frame",
+                            kind: Image(
+                                texture: "topbar",
+                                uv: (0.0, 0.0, 0.25, 0.78125),
+                                fill: 1.0,
+                                crop: true,
+                            ),
+                            anchors: (
+                                min: (0.0, 0.0),
+                                max: (0.0, 0.0),
+                            ),
+                            position: (64.4, 47.2),
+                            size: (113.1, 38.9),
+                            layer: 52,
+                        ),
+                        (
+                            name: "Track",
+                            kind: Group,
+                            anchors: (
+                                min: (0.0, 0.0),
+                                max: (0.0, 0.0),
+                            ),
+                            position: (177.5, 55.6),
+                            size: (226.78125, 18.6),
+                            layer: 51,
+                            children: [
+                                (
+                                    name: "Bar",
+                                    kind: Image(
+                                        texture: "teams/{team.left}/QWC_GUI_SnitchBar",
+                                        uv: (0.0, 0.0, 0.7421875, 0.75),
+                                        fill: 0.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (1.0, 1.0),
+                                    ),
+                                    position: (0.0, 0.0),
+                                    size: (0.0, 0.0),
+                                    layer: 51,
+                                    drivers: [
+                                        (
+                                            value: "power.left",
+                                            property: Fill,
+                                            keys: [
+                                                (0.0, 0.0),
+                                                (1.0, 1.0),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                (
+                                    name: "Snitch half",
+                                    kind: Image(
+                                        texture: "QWC_GUI_SnitchLeft",
+                                        uv: (0.0, 0.0, 1.0, 1.0),
+                                        fill: 1.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (0.0, 0.0),
+                                    ),
+                                    position: (-5.821875, -16.7),
+                                    size: (41.4, 52.0),
+                                    layer: 54,
+                                    show_if: "!seeker_game",
+                                    drivers: [
+                                        (
+                                            value: "power.left",
+                                            property: AnchorX,
+                                            keys: [
+                                                (0.0, 0.0),
+                                                (1.0, 1.0),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                (
+                                    name: "Snitch glow",
+                                    kind: Image(
+                                        texture: "snitch_glow",
+                                        uv: (0.0, 0.0, 1.0, 1.0),
+                                        fill: 1.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (0.0, 0.0),
+                                    ),
+                                    position: (-22.890625, -42.7),
+                                    size: (104.0, 104.0),
+                                    layer: 53,
+                                    show_if: "seeker_game",
+                                    drivers: [
+                                        (
+                                            value: "power.left",
+                                            property: AnchorX,
+                                            keys: [
+                                                (0.0, 0.0),
+                                                (1.0, 1.0),
+                                            ],
+                                        ),
+                                        (
+                                            value: "seeker.glow",
+                                            property: Opacity,
+                                            keys: [
+                                                (0.0, -1.0),
+                                                (1.0, 0.0),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                            ],
+                        ),
+                        (
+                            name: "Score",
+                            kind: Number(
+                                value: "score.left",
+                                digits: 3,
+                                numerals: "QWC_GUI_Numerals{d}_execversion",
+                                glyph: (44.7, 40.9),
+                                step: 34.3,
+                                justify: 0.5,
+                            ),
+                            anchors: (
+                                min: (0.0, 0.0),
+                                max: (0.0, 0.0),
+                            ),
+                            position: (64.4, 44.35),
+                            size: (113.1, 40.9),
+                            layer: 54,
+                        ),
+                        (
+                            name: "Moves",
+                            kind: Group,
+                            anchors: (
+                                min: (0.0, 0.0),
+                                max: (0.0, 0.0),
+                            ),
+                            position: (64.4, 90.1),
+                            size: (92.0, 28.0),
+                            layer: 54,
+                            show_if: "cards.left",
+                            children: [
+                                (
+                                    name: "Dodge",
+                                    kind: Image(
+                                        texture: "{card.left.0}",
+                                        uv: (0.0, 0.0, 1.0, 1.0),
+                                        fill: 1.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (0.0, 0.0),
+                                    ),
+                                    position: (0.0, 0.0),
+                                    size: (28.0, 28.0),
+                                    layer: 54,
+                                ),
+                                (
+                                    name: "Bludger",
+                                    kind: Image(
+                                        texture: "{card.left.1}",
+                                        uv: (0.0, 0.0, 1.0, 1.0),
+                                        fill: 1.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (0.0, 0.0),
+                                    ),
+                                    position: (32.0, 0.0),
+                                    size: (28.0, 28.0),
+                                    layer: 54,
+                                ),
+                                (
+                                    name: "Special",
+                                    kind: Image(
+                                        texture: "{card.left.2}",
+                                        uv: (0.0, 0.0, 1.0, 1.0),
+                                        fill: 1.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (0.0, 0.0),
+                                    ),
+                                    position: (64.0, 0.0),
+                                    size: (28.0, 28.0),
+                                    layer: 54,
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+                (
+                    name: "Away",
+                    kind: Group,
+                    anchors: (
+                        min: (0.0, 0.0),
+                        max: (1.0, 1.0),
+                    ),
+                    position: (0.0, 0.0),
+                    size: (0.0, 0.0),
+                    scale: (-1.0, 1.0),
+                    layer: 52,
+                    children: [
+                        (
+                            name: "Box fill",
+                            kind: Image(
+                                texture: "topbar_white_alpha",
+                                uv: (0.0, 0.0, 0.5546875, 0.671875),
+                                fill: 1.0,
+                                crop: true,
+                            ),
+                            anchors: (
+                                min: (0.0, 0.0),
+                                max: (0.0, 0.0),
+                            ),
+                            position: (64.4, 47.2),
+                            size: (113.1, 38.9),
+                            layer: 50,
+                            tint: "colour.right",
+                        ),
+                        (
+                            name: "Box frame",
+                            kind: Image(
+                                texture: "topbar",
+                                uv: (0.0, 0.0, 0.25, 0.78125),
+                                fill: 1.0,
+                                crop: true,
+                            ),
+                            anchors: (
+                                min: (0.0, 0.0),
+                                max: (0.0, 0.0),
+                            ),
+                            position: (64.4, 47.2),
+                            size: (113.1, 38.9),
+                            layer: 52,
+                        ),
+                        (
+                            name: "Track",
+                            kind: Group,
+                            anchors: (
+                                min: (0.0, 0.0),
+                                max: (0.0, 0.0),
+                            ),
+                            position: (177.5, 55.6),
+                            size: (226.78125, 18.6),
+                            layer: 51,
+                            children: [
+                                (
+                                    name: "Bar",
+                                    kind: Image(
+                                        texture: "teams/{team.right}/QWC_GUI_SnitchBar",
+                                        uv: (0.0, 0.0, 0.7421875, 0.75),
+                                        fill: 0.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (1.0, 1.0),
+                                    ),
+                                    position: (0.0, 0.0),
+                                    size: (0.0, 0.0),
+                                    layer: 51,
+                                    drivers: [
+                                        (
+                                            value: "power.right",
+                                            property: Fill,
+                                            keys: [
+                                                (0.0, 0.0),
+                                                (1.0, 1.0),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                (
+                                    name: "Snitch half",
+                                    kind: Image(
+                                        texture: "QWC_GUI_SnitchRight",
+                                        uv: (0.0, 0.0, 1.0, 1.0),
+                                        flip: (true, false),
+                                        fill: 1.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (0.0, 0.0),
+                                    ),
+                                    position: (-8.409375, -16.7),
+                                    size: (41.4, 52.0),
+                                    layer: 54,
+                                    show_if: "!seeker_game",
+                                    drivers: [
+                                        (
+                                            value: "power.right",
+                                            property: AnchorX,
+                                            keys: [
+                                                (0.0, 0.0),
+                                                (1.0, 1.0),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                (
+                                    name: "Snitch glow",
+                                    kind: Image(
+                                        texture: "snitch_glow",
+                                        uv: (0.0, 0.0, 1.0, 1.0),
+                                        fill: 1.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (0.0, 0.0),
+                                    ),
+                                    position: (-22.890625, -42.7),
+                                    size: (104.0, 104.0),
+                                    layer: 53,
+                                    show_if: "seeker_game",
+                                    drivers: [
+                                        (
+                                            value: "power.right",
+                                            property: AnchorX,
+                                            keys: [
+                                                (0.0, 0.0),
+                                                (1.0, 1.0),
+                                            ],
+                                        ),
+                                        (
+                                            value: "seeker.glow",
+                                            property: Opacity,
+                                            keys: [
+                                                (0.0, -1.0),
+                                                (1.0, 0.0),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                            ],
+                        ),
+                        (
+                            name: "Score",
+                            kind: Number(
+                                value: "score.right",
+                                digits: 3,
+                                numerals: "QWC_GUI_Numerals{d}_execversion",
+                                glyph: (44.7, 40.9),
+                                step: 34.3,
+                                justify: 0.5,
+                            ),
+                            anchors: (
+                                min: (0.0, 0.0),
+                                max: (0.0, 0.0),
+                            ),
+                            position: (64.4, 44.35),
+                            size: (113.1, 40.9),
+                            layer: 54,
+                        ),
+                        (
+                            name: "Moves",
+                            kind: Group,
+                            anchors: (
+                                min: (0.0, 0.0),
+                                max: (0.0, 0.0),
+                            ),
+                            position: (64.4, 90.1),
+                            size: (92.0, 28.0),
+                            layer: 54,
+                            show_if: "cards.right",
+                            children: [
+                                (
+                                    name: "Special",
+                                    kind: Image(
+                                        texture: "{card.right.2}",
+                                        uv: (0.0, 0.0, 1.0, 1.0),
+                                        flip: (true, false),
+                                        fill: 1.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (0.0, 0.0),
+                                    ),
+                                    position: (0.0, 0.0),
+                                    size: (28.0, 28.0),
+                                    layer: 54,
+                                ),
+                                (
+                                    name: "Bludger",
+                                    kind: Image(
+                                        texture: "{card.right.1}",
+                                        uv: (0.0, 0.0, 1.0, 1.0),
+                                        flip: (true, false),
+                                        fill: 1.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (0.0, 0.0),
+                                    ),
+                                    position: (32.0, 0.0),
+                                    size: (28.0, 28.0),
+                                    layer: 54,
+                                ),
+                                (
+                                    name: "Dodge",
+                                    kind: Image(
+                                        texture: "{card.right.0}",
+                                        uv: (0.0, 0.0, 1.0, 1.0),
+                                        flip: (true, false),
+                                        fill: 1.0,
+                                        crop: true,
+                                    ),
+                                    anchors: (
+                                        min: (0.0, 0.0),
+                                        max: (0.0, 0.0),
+                                    ),
+                                    position: (64.0, 0.0),
+                                    size: (28.0, 28.0),
+                                    layer: 54,
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        (
+            name: "Home gauge",
+            kind: Group,
+            anchors: (
+                min: (0.0, 0.5),
+                max: (0.0, 0.5),
+            ),
+            position: (16.0, 6.0),
+            size: (48.0, 192.0),
+            alignment: (0.0, 0.5),
+            layer: 53,
+            show_if: "race",
+            pivot: (0.5, 1.0),
+            drivers: [
+                (
+                    value: "seeker.appear",
+                    property: ScaleY,
+                    keys: [
+                        (0.0, -1.0),
+                        (1.0, 0.0),
+                    ],
+                ),
+                (
+                    value: "seeker.appear",
+                    property: Opacity,
+                    keys: [
+                        (0.0, -1.0),
+                        (1.0, 0.0),
+                    ],
+                ),
+            ],
+            children: [
+                (
+                    name: "Frame",
+                    kind: Image(
+                        texture: "seeker_power_indicator",
+                        uv: (0.0, 0.0, 1.0, 1.0),
+                        fill: 1.0,
+                        crop: true,
+                    ),
+                    anchors: (
+                        min: (0.0, 0.0),
+                        max: (0.0, 0.0),
+                    ),
+                    position: (0.0, 0.0),
+                    size: (48.0, 192.0),
+                    layer: 53,
+                ),
+                (
+                    name: "Level",
+                    kind: Image(
+                        texture: "{seeker.left.bar}",
+                        uv: (0.0, 0.0, 1.0, 1.0),
+                        fill: 0.0,
+                        fill_from: Bottom,
+                        crop: false,
+                    ),
+                    anchors: (
+                        min: (0.0, 0.0),
+                        max: (0.0, 0.0),
+                    ),
+                    position: (12.0, 3.0),
+                    size: (13.5, 120.0),
+                    layer: 54,
+                    drivers: [
+                        (
+                            value: "seeker.left.level",
+                            property: Fill,
+                            keys: [
+                                (0.0, 0.0),
+                                (1.0, 1.0),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        (
+            name: "Away gauge",
+            kind: Group,
+            anchors: (
+                min: (1.0, 0.5),
+                max: (1.0, 0.5),
+            ),
+            position: (-16.0, 6.0),
+            size: (48.0, 192.0),
+            alignment: (1.0, 0.5),
+            layer: 53,
+            show_if: "race",
+            pivot: (0.5, 1.0),
+            drivers: [
+                (
+                    value: "seeker.appear",
+                    property: ScaleY,
+                    keys: [
+                        (0.0, -1.0),
+                        (1.0, 0.0),
+                    ],
+                ),
+                (
+                    value: "seeker.appear",
+                    property: Opacity,
+                    keys: [
+                        (0.0, -1.0),
+                        (1.0, 0.0),
+                    ],
+                ),
+            ],
+            children: [
+                (
+                    name: "Frame",
+                    kind: Image(
+                        texture: "seeker_power_indicator",
+                        uv: (0.0, 0.0, 1.0, 1.0),
+                        fill: 1.0,
+                        crop: true,
+                    ),
+                    anchors: (
+                        min: (0.0, 0.0),
+                        max: (0.0, 0.0),
+                    ),
+                    position: (0.0, 0.0),
+                    size: (48.0, 192.0),
+                    layer: 53,
+                ),
+                (
+                    name: "Level",
+                    kind: Image(
+                        texture: "{seeker.right.bar}",
+                        uv: (0.0, 0.0, 1.0, 1.0),
+                        fill: 0.0,
+                        fill_from: Bottom,
+                        crop: false,
+                    ),
+                    anchors: (
+                        min: (0.0, 0.0),
+                        max: (0.0, 0.0),
+                    ),
+                    position: (12.0, 3.0),
+                    size: (13.5, 120.0),
+                    layer: 54,
+                    drivers: [
+                        (
+                            value: "seeker.right.level",
+                            property: Fill,
+                            keys: [
+                                (0.0, 0.0),
+                                (1.0, 1.0),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    ],
+)

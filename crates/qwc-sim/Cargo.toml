@@ -1,0 +1,15 @@
+[package]
+name = "qwc-sim"
+version.workspace = true
+description = "QWC gameplay rules at the original 24 Hz tick: console variables, passing AI, the Seeker game"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+qwc-formats = { path = "../qwc-formats" }
+# the transcendental functions in plain Rust, the same bits on every platform (`fmath`, online play)
+libm = "0.2.16"
+
+[dev-dependencies]
+qwc-assets = { path = "../qwc-assets" }

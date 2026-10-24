@@ -1,0 +1,11 @@
+[package]
+name = "qwc-text"
+version.workspace = true
+description = "The remaster's text: the game's bitmap fonts drawn with vector fonts at screen resolution"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# shaping (kerning, ligatures, marks) and glyph rasterising from OTF/TTF outlines, pure Rust
+swash = "0.2.10"

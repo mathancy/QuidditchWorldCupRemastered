@@ -1,0 +1,31 @@
+[package]
+name = "qwc-studio"
+version.workspace = true
+description = "QWC Studio: the remaster's editor (resource packs, the HUD's layouts, the front end's screens, the stadiums' looks)"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+qwc-anim = { path = "../qwc-anim" }
+qwc-assets = { path = "../qwc-assets" }
+qwc-feck = { path = "../qwc-feck" }
+qwc-formats = { path = "../qwc-formats" }
+qwc-frontend = { path = "../qwc-frontend" }
+qwc-game = { path = "../qwc-game" }
+qwc-hud = { path = "../qwc-hud" }
+qwc-packs = { path = "../qwc-packs" }
+qwc-sim = { path = "../qwc-sim" }
+qwc-style = { path = "../qwc-style" }
+rfd = "0.17.2"
+semver = "1"
+qwc-render = { path = "../qwc-render" }
+qwc-text = { path = "../qwc-text" }
+eframe = { version = "0.37", default-features = false, features = ["default_fonts", "wgpu", "wayland", "x11", "clipboard"] }
+
+[dev-dependencies]
+egui_kittest = { version = "0.37.0", features = ["wgpu"] }
+
+# the exe's icon (build.rs)
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"

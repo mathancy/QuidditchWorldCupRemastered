@@ -1,0 +1,16 @@
+[package]
+name = "qwc-assets"
+version.workspace = true
+description = "Virtual file system over the QWC game data and typed asset loading"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+qwc-formats = { path = "../qwc-formats" }
+serde_json.workspace = true
+png = "0.17"
+jpeg-decoder = { version = "0.3", default-features = false }
+intel_tex_2 = "0.5.0"
+
+[dev-dependencies]

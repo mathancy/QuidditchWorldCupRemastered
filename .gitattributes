@@ -1,0 +1,4 @@
+# Scripts that run on Linux keep LF in every checkout (a Windows checkout's CRLF breaks them, packaging/linux too)
+*.sh text eol=lf
+packaging/linux/AppRun text eol=lf
+packaging/linux/*.desktop text eol=lf

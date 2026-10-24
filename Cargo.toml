@@ -1,0 +1,54 @@
+[workspace]
+resolver = "2"
+members = ["crates/qwc-formats", "crates/qwc-dump", "crates/qwc-assets", "crates/qwc-anim", "crates/qwc-render", "crates/qwc-audio", "crates/qwc-sim", "crates/qwc-feck", "crates/qwc-video", "crates/qwc-text", "crates/qwc-frontend", "crates/qwc-hud", "crates/qwc-studio", "crates/qwc-game", "crates/qwc-packs", "crates/qwc-launcher", "crates/qwc-settings", "crates/qwc-style", "crates/qwc-net"]
+
+[workspace.package]
+# the remaster's one version: the launcher's, the packs' `engine`, the release tag's (`docs/RELEASING.md`)
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-or-later"
+
+[workspace.dependencies]
+serde_json = "1"
+regex = "1"
+
+# The movies' decoding is built optimised in debug builds too, so movies play at speed there (OpenH264's C is
+# compiled with the package's level).
+[profile.dev.package.qwc-video]
+opt-level = 3
+[profile.dev.package.openh264]
+opt-level = 3
+[profile.dev.package.openh264-sys2]
+opt-level = 3
+[profile.dev.package.symphonia-core]
+opt-level = 3
+[profile.dev.package.symphonia-format-isomp4]
+opt-level = 3
+[profile.dev.package.symphonia-codec-aac]
+opt-level = 3
+# ...the text's shaping and rasterising (every glyph is drawn at its size on screen)...
+[profile.dev.package.qwc-text]
+opt-level = 3
+[profile.dev.package.swash]
+opt-level = 3
+[profile.dev.package.zeno]
+opt-level = 3
+[profile.dev.package.skrifa]
+opt-level = 3
+[profile.dev.package.read-fonts]
+opt-level = 3
+# ...and the PNG decoder, for the remastered textures (often thousands of pixels a side)
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.crc32fast]
+opt-level = 3
+[profile.dev.package.simd-adler32]
+opt-level = 3
+# ...and the launcher's hashing of the game files (hundreds of MB)
+[profile.dev.package.sha2]
+opt-level = 3

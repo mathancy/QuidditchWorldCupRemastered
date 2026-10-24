@@ -1,0 +1,207 @@
+# The release pipeline (docs/RELEASING.md). On a version tag vX.Y.Z it builds the Windows installer and the Linux
+# AppImage and tarball, signs the Windows files through SignPath when it is set up, and publishes them with their
+# SHA-256 sums as a GitHub release: the files and names the launcher's updater looks for. Run by hand
+# (workflow_dispatch) or on a pull request that changes the packaging, it builds the same files and keeps them as the
+# run's artifacts, publishing nothing.
+#
+# The checkouts are sparse: only the code, the packaging and the remaster's own shipped files. Nothing of the game
+# is read or shipped.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  # a change to the packaging is built (and published nowhere) before it is merged
+  pull_request:
+    paths: ["packaging/**", ".github/workflows/release.yml"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: crates
+      - id: v
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          if [ -z "$version" ]; then echo "::error::no workspace version in Cargo.toml"; exit 1; fi
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::the tag $GITHUB_REF_NAME is not v$version, the version in Cargo.toml"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$version" in *-*) echo "prerelease=true" ;; *) echo "prerelease=false" ;; esac >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      SIGN: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+          sparse-checkout: |
+            crates
+            packaging
+            remastered/fonts
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # OpenH264's assembly (qwc-video): without NASM the movies decode at half speed
+      - uses: ilammy/setup-nasm@v1
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.2
+      - name: Build
+        run: cargo build --release --locked -p qwc-launcher -p qwc-game -p qwc-studio
+      - name: Licences
+        run: cargo about generate --locked -c packaging/about.toml packaging/about.hbs -o target/THIRD-PARTY-LICENSES.html
+      - name: Stage
+        run: python packaging/stage.py --bin target/release --out target/stage --notices target/THIRD-PARTY-LICENSES.html
+
+      # signed before they are packed, so the installed programs carry the signature too
+      - if: env.SIGN == 'true'
+        id: programs
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-programs-unsigned
+          path: target/stage/*.exe
+      - if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT || 'qwc-remastered' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY || 'release-signing' }}
+          artifact-configuration-slug: programs
+          github-artifact-id: ${{ steps.programs.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: target/stage
+
+      - name: Installer
+        shell: pwsh
+        run: |
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          & $iscc /Q "/DAppVersion=$env:VERSION" packaging\windows\qwc-remastered.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - if: env.SIGN == 'true'
+        id: installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-unsigned
+          path: target/dist/*.exe
+      - if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT || 'qwc-remastered' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY || 'release-signing' }}
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.installer.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: target/dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: target/dist/QWCRemastered-*-setup.exe
+          if-no-files-found: error
+
+  linux:
+    needs: version
+    # the oldest supported runner, so the programs run on older systems' glibc
+    runs-on: ubuntu-22.04
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+          sparse-checkout: |
+            crates
+            packaging
+            remastered/fonts
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: ilammy/setup-nasm@v1
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.2
+      # cpal (sound) links ALSA, gilrs (gamepads) udev
+      - run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev
+      - name: Build
+        run: cargo build --release --locked -p qwc-launcher -p qwc-game -p qwc-studio
+      - name: Licences
+        run: cargo about generate --locked -c packaging/about.toml packaging/about.hbs -o target/THIRD-PARTY-LICENSES.html
+      - name: Stage
+        run: python3 packaging/stage.py --bin target/release --out target/stage --notices target/THIRD-PARTY-LICENSES.html
+      - name: AppImage and tarball
+        env:
+          # the runner has no FUSE: appimagetool runs from its own extracted copy
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          APPIMAGETOOL: ${{ runner.temp }}/appimagetool
+        run: |
+          curl -fsSL -o "$APPIMAGETOOL" https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x "$APPIMAGETOOL"
+          bash packaging/linux/build.sh "$VERSION" target/stage target/dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            target/dist/QWCRemastered-*-x86_64.AppImage
+            target/dist/QWCRemastered-*-x86_64-linux.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: [version, windows, linux]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: packaging/releases
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Sums
+        working-directory: dist
+        run: |
+          sha256sum QWCRemastered-* > SHA256SUMS
+          cat SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: dist/*
+      # only a tag publishes, and only from the public repo (or where RELEASES_HERE is set): the private one builds
+      - if: github.ref_type == 'tag' && (github.repository == 'mathancy/QuidditchWorldCupRemastered' || vars.RELEASES_HERE == 'true')
+        name: Publish
+        run: |
+          notes="packaging/releases/v$VERSION.md"
+          args=(--title "QWC Remastered $VERSION" --verify-tag)
+          if [ -f "$notes" ]; then args+=(--notes-file "$notes"); else args+=(--generate-notes); fi
+          if [ "${{ needs.version.outputs.prerelease }}" = true ]; then args+=(--prerelease); fi
+          gh release create "v$VERSION" dist/* "${args[@]}"

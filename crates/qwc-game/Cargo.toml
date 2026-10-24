@@ -1,0 +1,32 @@
+[package]
+name = "qwc-game"
+version.workspace = true
+description = "The QWC remaster executable (for now: a model, animation and audio viewer)"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+qwc-anim = { path = "../qwc-anim" }
+qwc-audio = { path = "../qwc-audio" }
+qwc-assets = { path = "../qwc-assets" }
+qwc-feck = { path = "../qwc-feck" }
+qwc-formats = { path = "../qwc-formats" }
+qwc-frontend = { path = "../qwc-frontend" }
+ron = "0.12"
+serde = { version = "1", features = ["derive"] }
+qwc-hud = { path = "../qwc-hud" }
+qwc-net = { path = "../qwc-net" }
+qwc-packs = { path = "../qwc-packs" }
+qwc-settings = { path = "../qwc-settings" }
+qwc-render = { path = "../qwc-render" }
+qwc-sim = { path = "../qwc-sim" }
+qwc-text = { path = "../qwc-text" }
+qwc-video = { path = "../qwc-video" }
+gilrs = "0.11"
+png = "0.17"
+winit = "0.30"
+
+# the exe's icon (build.rs)
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"

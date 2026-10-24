@@ -1,0 +1,11 @@
+[package]
+name = "qwc-style"
+version.workspace = true
+description = "The remaster's look for its egui programs: the launcher's and QWC Studio's colours, fonts and logo"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+eframe = { version = "0.37.0", default-features = false }
+png = "0.17"

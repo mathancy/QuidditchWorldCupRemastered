@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>QWC Remastered: third-party licences</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 60em; margin: 2em auto; padding: 0 1em; line-height: 1.4; }
+  pre { white-space: pre-wrap; background: #f4f1ea; padding: 1em; font-size: 0.85em; }
+  li { margin: 0.1em 0; }
+</style>
+</head>
+<body>
+<h1>Third-party licences</h1>
+<p>QWC Remastered is free software under the GNU General Public License, version 3 or later (the file LICENSE).
+It is built with the Rust crates below, each under its own licence. The fonts' licences (SIL Open Font License) are
+beside them in remastered/fonts/.</p>
+<h2>Overview</h2>
+<ul>
+{{#each overview}}  <li><a href="#{{id}}">{{name}}</a> ({{count}})</li>
+{{/each}}</ul>
+<h2>Licences</h2>
+{{#each licenses}}<h3 id="{{id}}">{{name}}</h3>
+<p>Used by:</p>
+<ul>
+{{#each used_by}}  <li>{{crate.name}} {{crate.version}}</li>
+{{/each}}</ul>
+<pre>{{text}}</pre>
+{{/each}}
+</body>
+</html>

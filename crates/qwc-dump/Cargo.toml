@@ -1,0 +1,11 @@
+[package]
+name = "qwc-dump"
+version.workspace = true
+description = "Dump a QWC data file as JSON (same schema as tools/dump_json.py)"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+qwc-formats = { path = "../qwc-formats" }
+serde_json.workspace = true

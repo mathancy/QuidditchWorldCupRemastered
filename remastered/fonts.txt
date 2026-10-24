@@ -1,0 +1,47 @@
+# Remastered fonts: the vector fonts (OTF/TTF) that draw the game's text in place of its bitmap fonts (.ffn).
+#
+#   FAMILY = UPRIGHT [ITALIC]        the font files, relative to this file
+#
+# FAMILY is an original font's name without its size and style: TiepoloBlkITCTT30i_ds.ffn is family TiepoloBlkITCTT
+# at size 30, italic (i), with a drop shadow (_ds). Every family comes in 12, 12i_ds, 16_ds, 16i_ds, 24i_ds and
+# 30i_ds. Each original's line height sets its vector font's size, so the game's line spacing and wrapping stay;
+# glyphs are drawn at the size they are shown, in their own proportions.
+#
+#   scale FAMILY = N                 a size factor for a family (1 by default)
+#   slant FAMILY = DEGREES           its italic styles drawn leaning DEGREES to the right (for a family without an
+#                                    italic file: the upright font leaned over; the original's Tiepolo italic leans 10)
+#   shadow = DX DY OPACITY BLUR      the _ds styles' shadow: offset right and down, its opacity, its softness
+#                                    (DX, DY and BLUR in fractions of the font's size)
+#   gold = TOP BOTTOM [SIZES...]     the gold of the large headings (24 and 30 by default), from the capitals' top
+#                                    to the baseline (rrggbb); the other sizes are white, tinted by the game
+#   fallback = FILE...               fonts for the characters a family's own font lacks, tried in turn
+
+# Every font here is under the SIL Open Font License (the OFL-*.txt files beside them), so the remaster can ship them.
+#
+# Latin: every Latin-script language but Polish and Czech (Tiepolo in the original, a commercial font the remaster
+# cannot ship): Germania One, upright only, leaned for the italic styles. Anyone with a licensed Tiepolo can point
+# this line at their own files (e.g. `= tiepolo/Tiepolo-Black.otf tiepolo/Tiepolo-BlackItalic.otf`, a folder
+# that stays local) and drop the slant.
+TiepoloBlkITCTT = fonts/GermaniaOne-Regular.ttf
+slant TiepoloBlkITCTT = 10
+# Polish and Czech (Sabon in the original; Germania One lacks their letters): Cardo
+SabonCEMT = fonts/Cardo-Regular.ttf fonts/Cardo-Italic.ttf
+
+# The other scripts: Google's Noto Sans (SIL Open Font License, OFL-Noto.txt), fixed at one weight and cut down to
+# the characters the game's own fonts have (scripts/subset_fonts.py). No italics: those styles are upright.
+# Simplified Chinese
+M = fonts/NotoSansSC-Bold.ttf
+# Traditional Chinese
+ARHeiti2ExtraB5 = fonts/NotoSansTC-Bold.ttf
+# Japanese
+DFGKakuPop-W5 = fonts/NotoSansJP-Bold.ttf
+# Korean
+AsiaMMGD-M = fonts/NotoSansKR-Bold.ttf
+# Thai
+BrowalliaNew = fonts/NotoSansThai-SemiBold.ttf
+
+# For a character a family's font lacks (Japanese's few Han characters, Thai's Latin-1 signs)
+fallback = fonts/NotoSansSC-Bold.ttf
+
+shadow = 0.05 0.05 0.85 0.02
+gold = fff7cd de9f34 24 30

@@ -1,0 +1,5 @@
+#!/bin/sh
+# The AppImage's entry: the launcher in usr/lib/qwc-remastered, with the game and QWC Studio beside it and the
+# shipped files under it (packaging/stage.py).
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/usr/lib/qwc-remastered/qwc-launcher" "$@"

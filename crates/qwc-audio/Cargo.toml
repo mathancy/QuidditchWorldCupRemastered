@@ -1,0 +1,17 @@
+[package]
+name = "qwc-audio"
+version.workspace = true
+description = "Sound library, mixer and playback for the QWC remaster"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+qwc-assets = { path = "../qwc-assets" }
+qwc-formats = { path = "../qwc-formats" }
+cpal = { version = "0.18", optional = true }
+
+[features]
+default = ["playback"]
+# Output through the system's audio device. Without it the mixer still renders into buffers (tests, offline tools).
+playback = ["dep:cpal"]

@@ -1,0 +1,9 @@
+[package]
+name = "qwc-net"
+version.workspace = true
+description = "Online play with no server: one player hosts, the other joins, and both run the same match in lockstep"
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]

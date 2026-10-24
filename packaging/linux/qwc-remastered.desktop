@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=QWC Remastered
+Comment=Quidditch World Cup remastered, played from your own copy of the game
+Exec=qwc-launcher
+Icon=qwc-remastered
+Categories=Game;SportsGame;
+Terminal=false

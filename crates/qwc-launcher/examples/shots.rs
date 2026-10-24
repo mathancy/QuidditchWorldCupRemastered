@@ -128,4 +128,20 @@ stadium japan"
         .unwrap(),
     );
     shoot(out, "news", news);
+
+    // the first release's own notes (hard-wrapped Markdown, an alert, nested lists): the News page and the Home
+    // card's scrolling notes
+    let notes =
+        std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packaging/releases/v0.1.0.md"))
+            .expect("the release notes");
+    let first = serde_json::json!([{"tag_name": "v0.1.0", "name": "QWC Remastered 0.1.0",
+        "published_at": "2026-10-24T18:19:00Z", "body": notes, "assets": []}]);
+    let releases = || qwc_launcher::updates::parse(&first.to_string()).unwrap();
+    let mut news = Launcher::new(&root, Some(home_lib.clone()));
+    news.open(qwc_launcher::app::Page::News);
+    news.show_releases(releases());
+    shoot_sized(out, "news_notes", news, 1400.0);
+    let mut home = Launcher::new(&root, Some(home_lib.clone()));
+    home.show_releases(releases());
+    shoot(out, "home_notes", home);
 }

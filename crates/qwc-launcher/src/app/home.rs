@@ -205,15 +205,8 @@ fn kind(k: &str) -> String {
     }
 }
 
-/// The note lines of a release's text: its list items, without their marks.
-fn bullets(body: &str, n: usize) -> Vec<String> {
-    body.lines()
-        .map(str::trim)
-        .filter_map(|l| l.strip_prefix("- ").or_else(|| l.strip_prefix("* ")))
-        .map(|l| l.replace("**", ""))
-        .take(n)
-        .collect()
-}
+/// The notes' quotes and alerts on the parchment: a deep red.
+const NOTE: Color32 = Color32::from_rgb(0x8a, 0x2a, 0x1e);
 
 /// How far down a parchment card its title sits.
 const TITLE: f32 = 16.0;
@@ -484,9 +477,36 @@ impl Launcher {
                         );
                         ui.label(egui::RichText::new(format!("  {}", r.date())).color(style::INK_DIM));
                     });
-                    for b in bullets(r.body.as_deref().unwrap_or(""), 5) {
-                        ui.label(egui::RichText::new(format!("\u{2022} {b}")).color(style::INK));
-                    }
+                    // the notes scroll in the room above the button, the bar always shown (the fade at the
+                    // edge is drawn in the panel's dark colour, wrong on the paper)
+                    let room = Rect::from_min_max(ui.cursor().min, pos2(body.right(), body.bottom() - 48.0));
+                    ui.scope_builder(egui::UiBuilder::new().max_rect(room), |ui| {
+                        ui.spacing_mut().scroll.fade.strength = 0.0;
+                        let scroll = &mut ui.spacing_mut().scroll;
+                        scroll.dormant_handle_opacity = 0.6;
+                        // a bar wide enough to see, beside the text rather than over it
+                        scroll.floating_width = 5.0;
+                        scroll.floating_allocated_width = 10.0;
+                        // the bar in ink, its track a darker paper (the labels have their own colours)
+                        let w = &mut ui.visuals_mut().widgets;
+                        for (v, ink) in [
+                            (&mut w.inactive, style::INK_DIM),
+                            (&mut w.hovered, style::INK),
+                            (&mut w.active, style::INK),
+                        ] {
+                            v.fg_stroke.color = ink;
+                        }
+                        ui.visuals_mut().extreme_bg_color = Color32::from_rgba_unmultiplied(0x6b, 0x5a, 0x44, 40);
+                        egui::ScrollArea::vertical()
+                            .auto_shrink(false)
+                            .max_height(room.height())
+                            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+                            .show(ui, |ui| {
+                                ui.spacing_mut().item_spacing.y = 3.0;
+                                let body = r.body.as_deref().unwrap_or("");
+                                super::news::draw_notes(ui, body, style::INK, NOTE, 15.0);
+                            });
+                    });
                 }
                 None => {
                     let v = updates::current();
@@ -613,6 +633,5 @@ mod tests {
         assert_eq!(super::team("England"), "England");
         assert_eq!(super::stadium("hog_sum"), "Hogwarts, summer");
         assert_eq!(super::stadium("japan"), "Japan");
-        assert_eq!(super::bullets("Hi\n- one\n* **two**\nx", 5), ["one", "two"]);
     }
 }

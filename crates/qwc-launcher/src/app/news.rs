@@ -7,7 +7,32 @@ use eframe::egui::{self, RichText};
 
 use super::{Job, Launcher};
 use crate::style;
-use crate::updates::{self, Release};
+use crate::updates::{self, Block, Release};
+
+/// A release's notes ([`updates::notes`]) in `ink`, quotes and alerts in `note`, headings at `heading` points.
+pub(super) fn draw_notes(ui: &mut egui::Ui, body: &str, ink: egui::Color32, note: egui::Color32, heading: f32) {
+    for block in updates::notes(body) {
+        match block {
+            Block::Heading(t) => {
+                ui.add_space(4.0);
+                ui.label(RichText::new(t).font(egui::FontId::new(heading, style::heading_family())).color(ink));
+            }
+            Block::Text(t) => {
+                ui.label(RichText::new(t).color(ink));
+            }
+            Block::Note(t) => {
+                ui.label(RichText::new(t).color(note).strong());
+            }
+            Block::Item(depth, t) => {
+                ui.horizontal_top(|ui| {
+                    ui.add_space(20.0 * depth as f32);
+                    ui.label(RichText::new(if depth == 0 { "\u{2022}" } else { "\u{2013}" }).color(ink));
+                    ui.add(egui::Label::new(RichText::new(t).color(ink)).wrap());
+                });
+            }
+        }
+    }
+}
 
 #[derive(Default)]
 pub(super) struct NewsView {
@@ -160,9 +185,7 @@ impl Launcher {
                             ui.label(RichText::new(r.date()).small().color(style::DIM));
                         });
                         if let Some(body) = r.body.as_deref().filter(|b| !b.trim().is_empty()) {
-                            for line in body.lines().take(40) {
-                                ui.label(line.trim_start_matches('#').trim());
-                            }
+                            draw_notes(ui, body, style::TEXT, style::WARN, 18.0);
                         }
                     });
                     ui.add_space(6.0);

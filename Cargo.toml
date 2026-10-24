@@ -4,7 +4,7 @@ members = ["crates/qwc-formats", "crates/qwc-dump", "crates/qwc-assets", "crates
 
 [workspace.package]
 # the remaster's one version: the launcher's, the packs' `engine`, the release tag's (`docs/RELEASING.md`)
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 publish = false
 license = "GPL-3.0-or-later"

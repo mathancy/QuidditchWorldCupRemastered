@@ -2432,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-anim"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "qwc-assets",
  "qwc-formats",
@@ -2441,7 +2441,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-assets"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "intel_tex_2",
  "jpeg-decoder",
@@ -2452,7 +2452,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-audio"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cpal",
  "qwc-assets",
@@ -2461,7 +2461,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-dump"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "qwc-formats",
  "serde_json",
@@ -2469,7 +2469,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-feck"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "qwc-anim",
  "qwc-assets",
@@ -2478,7 +2478,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-formats"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "regex",
  "serde_json",
@@ -2486,7 +2486,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-frontend"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "qwc-anim",
  "qwc-assets",
@@ -2500,7 +2500,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-game"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "gilrs",
  "png 0.17.16",
@@ -2526,7 +2526,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-hud"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ron",
  "serde",
@@ -2534,7 +2534,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-launcher"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "eframe",
  "egui_kittest",
@@ -2558,11 +2558,11 @@ dependencies = [
 
 [[package]]
 name = "qwc-net"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "qwc-packs"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "qwc-assets",
  "ron",
@@ -2573,7 +2573,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-render"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytemuck",
  "glam",
@@ -2588,7 +2588,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-settings"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ron",
  "serde",
@@ -2596,7 +2596,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-sim"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "libm",
  "qwc-assets",
@@ -2605,7 +2605,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-studio"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "eframe",
  "egui_kittest",
@@ -2628,7 +2628,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-style"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "eframe",
  "png 0.17.16",
@@ -2636,14 +2636,14 @@ dependencies = [
 
 [[package]]
 name = "qwc-text"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "swash",
 ]
 
 [[package]]
 name = "qwc-video"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "openh264",
  "qwc-formats",

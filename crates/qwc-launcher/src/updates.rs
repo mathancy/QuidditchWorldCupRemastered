@@ -77,6 +77,84 @@ impl Release {
     }
 }
 
+/// A piece of a release's notes, read from their Markdown ([`notes`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Block {
+    /// A `#` heading.
+    Heading(String),
+    /// A paragraph.
+    Text(String),
+    /// A list item and how deep it sits (0 at the left).
+    Item(usize, String),
+    /// A quote, or a GitHub alert (`> [!WARNING]`), without its marker.
+    Note(String),
+}
+
+/// A release's notes as blocks to draw: the lines GitHub's Markdown wraps joined into their paragraph, item or
+/// quote, and the inline marks (`**`, `` ` ``, a link's address) taken out.
+pub fn notes(body: &str) -> Vec<Block> {
+    let mut out: Vec<Block> = Vec::new();
+    // whether the last block takes the next line's words
+    let mut open = false;
+    for raw in body.lines() {
+        let line = raw.trim_end();
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() {
+            open = false;
+            continue;
+        }
+        if let Some(h) = trimmed.strip_prefix('#') {
+            out.push(Block::Heading(inline(h.trim_start_matches('#').trim())));
+            open = false;
+        } else if let Some(q) = trimmed.strip_prefix('>') {
+            let q = q.trim();
+            // an alert's marker line says nothing itself
+            if q.starts_with("[!") && q.ends_with(']') {
+                out.push(Block::Note(String::new()));
+                open = true;
+            } else if q.is_empty() {
+                open = false;
+            } else if let (true, Some(Block::Note(t))) = (open, out.last_mut()) {
+                join(t, q);
+            } else {
+                out.push(Block::Note(inline(q)));
+                open = true;
+            }
+        } else if let Some(item) = trimmed.strip_prefix("- ").or_else(|| trimmed.strip_prefix("* ")) {
+            let depth = (line.len() - trimmed.len()) / 2;
+            out.push(Block::Item(depth, inline(item.trim())));
+            open = true;
+        } else if let (true, Some(Block::Text(t) | Block::Item(_, t) | Block::Note(t))) = (open, out.last_mut()) {
+            join(t, trimmed);
+        } else {
+            out.push(Block::Text(inline(trimmed)));
+            open = true;
+        }
+    }
+    out.retain(|b| !matches!(b, Block::Note(t) if t.is_empty()));
+    out
+}
+
+/// `more` (a wrapped line) added to `text`.
+fn join(text: &mut String, more: &str) {
+    if !text.is_empty() {
+        text.push(' ');
+    }
+    text.push_str(&inline(more));
+}
+
+/// A line without its Markdown marks: bold and code marks gone, `[words](address)` as its words.
+fn inline(line: &str) -> String {
+    let mut s = line.replace("**", "").replace('`', "");
+    while let Some(open) = s.find('[') {
+        let Some(close) = s[open..].find("](").map(|c| open + c) else { break };
+        let Some(end) = s[close..].find(')').map(|e| close + e) else { break };
+        s.replace_range(close..=end, "");
+        s.remove(open);
+    }
+    s
+}
+
 /// The releases in GitHub's JSON, the newest first, drafts left out.
 pub fn parse(json: &str) -> Result<Vec<Release>, String> {
     let mut r: Vec<Release> = serde_json::from_str(json).map_err(|e| format!("the releases do not read: {e}"))?;
@@ -178,6 +256,35 @@ pub fn download(release: &Release, dir: &Path, progress: &Progress) -> Result<Pa
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn notes_join_their_wrapped_lines() {
+        let body = "The first release: rebuilt
+for today.
+
+> [!WARNING]
+> **Early.** Expect
+> bugs.
+
+## What you need
+
+- Your own `QWC.exe`: the
+  retail one is not read.
+- The launcher:
+  - sets up [your files](https://x/y);
+";
+        assert_eq!(
+            notes(body),
+            [
+                Block::Text("The first release: rebuilt for today.".into()),
+                Block::Note("Early. Expect bugs.".into()),
+                Block::Heading("What you need".into()),
+                Block::Item(0, "Your own QWC.exe: the retail one is not read.".into()),
+                Block::Item(0, "The launcher:".into()),
+                Block::Item(1, "sets up your files;".into()),
+            ]
+        );
+    }
 
     const JSON: &str = r#"[
         {"tag_name": "v0.3.0-beta.1", "prerelease": true, "assets": []},

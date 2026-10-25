@@ -683,72 +683,101 @@ pub fn set_role(base: &str, token: &str, id: &str, reviewer: bool) -> Result<(),
 // ---------------------------------------------------------------------------------------------------------------
 // The session token, kept for this user
 
+/// The file the token is kept in off Windows (and was, encrypted, on Windows before 0.1.3).
 fn token_path(library: &Path) -> PathBuf {
     library.join("account.token")
 }
 
+/// The token's name in Windows Credential Manager: one per library.
 #[cfg(windows)]
-mod dpapi {
-    use windows::Win32::Foundation::{LocalFree, HLOCAL};
-    use windows::Win32::Security::Cryptography::{
-        CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
+fn vault_name(library: &Path) -> String {
+    format!("QWC Remastered pack store ({})", library.display())
+}
+
+/// Windows Credential Manager, where programs keep their sign-ins (Git, the GitHub CLI and VS Code keep theirs
+/// there): the Windows user's own, on this computer. Kept there rather than in a file this program decrypts at start,
+/// which security software's heuristics took for a password stealer (0.1.2, `Trojan:Win32/Bearfoos.A!ml`).
+#[cfg(windows)]
+mod vault {
+    use windows::core::{HSTRING, PWSTR};
+    use windows::Win32::Security::Credentials::{
+        CredDeleteW, CredFree, CredReadW, CredWriteW, CREDENTIALW, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC,
     };
 
-    fn run(data: &[u8], protect: bool) -> Result<Vec<u8>, String> {
-        let input = CRYPT_INTEGER_BLOB { cbData: data.len() as u32, pbData: data.as_ptr() as *mut u8 };
-        let mut out = CRYPT_INTEGER_BLOB::default();
-        // SAFETY: `input` points at `data` for the call; `out` is filled by the call and freed with LocalFree below
+    pub fn write(name: &str, secret: &[u8]) -> Result<(), String> {
+        let mut wide: Vec<u16> = name.encode_utf16().chain([0]).collect();
+        let mut blob = secret.to_vec();
+        let cred = CREDENTIALW {
+            Type: CRED_TYPE_GENERIC,
+            TargetName: PWSTR(wide.as_mut_ptr()),
+            CredentialBlobSize: blob.len() as u32,
+            CredentialBlob: blob.as_mut_ptr(),
+            Persist: CRED_PERSIST_LOCAL_MACHINE,
+            ..Default::default()
+        };
+        // SAFETY: the name and the blob live for the call, which copies them
+        unsafe { CredWriteW(&cred, 0) }.map_err(|e| format!("Windows Credential Manager: {e}"))
+    }
+
+    pub fn read(name: &str) -> Option<Vec<u8>> {
+        let mut found: *mut CREDENTIALW = std::ptr::null_mut();
+        // SAFETY: the call fills `found`, which is read and then freed with CredFree
         unsafe {
-            if protect {
-                CryptProtectData(&input, None, None, None, None, CRYPTPROTECT_UI_FORBIDDEN, &mut out)
-            } else {
-                CryptUnprotectData(&input, None, None, None, None, CRYPTPROTECT_UI_FORBIDDEN, &mut out)
-            }
-            .map_err(|e| e.to_string())?;
-            let bytes = std::slice::from_raw_parts(out.pbData, out.cbData as usize).to_vec();
-            LocalFree(Some(HLOCAL(out.pbData.cast())));
-            Ok(bytes)
+            CredReadW(&HSTRING::from(name), CRED_TYPE_GENERIC, None, &mut found).ok()?;
+            let c = &*found;
+            let bytes = std::slice::from_raw_parts(c.CredentialBlob, c.CredentialBlobSize as usize).to_vec();
+            CredFree(found as *const _);
+            Some(bytes)
         }
     }
 
-    /// `data` encrypted for this Windows user (only they, on this computer, can read it back).
-    pub fn protect(data: &[u8]) -> Result<Vec<u8>, String> {
-        run(data, true)
-    }
-
-    pub fn unprotect(data: &[u8]) -> Result<Vec<u8>, String> {
-        run(data, false)
+    pub fn delete(name: &str) {
+        // SAFETY: a plain call with a name; none there is no error worth reporting
+        let _ = unsafe { CredDeleteW(&HSTRING::from(name), CRED_TYPE_GENERIC, None) };
     }
 }
 
-/// Keep the session token in the library: encrypted for this Windows user; elsewhere a file only the user can read.
+/// Keep the session token: in Windows Credential Manager on Windows; elsewhere a file in the library only the user
+/// can read.
 pub fn store_token(library: &Path, token: &str) -> Result<(), String> {
-    let path = token_path(library);
-    std::fs::create_dir_all(library).map_err(|e| format!("{}: {e}", library.display()))?;
     #[cfg(windows)]
-    let bytes = dpapi::protect(token.as_bytes())?;
-    #[cfg(not(windows))]
-    let bytes = token.as_bytes().to_vec();
-    std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
-    #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
-            .map_err(|e| format!("{}: {e}", path.display()))?;
+        // the file earlier versions kept, gone
+        let _ = std::fs::remove_file(token_path(library));
+        vault::write(&vault_name(library), token.as_bytes())
     }
-    Ok(())
+    #[cfg(not(windows))]
+    {
+        let path = token_path(library);
+        std::fs::create_dir_all(library).map_err(|e| format!("{}: {e}", library.display()))?;
+        std::fs::write(&path, token.as_bytes()).map_err(|e| format!("{}: {e}", path.display()))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+        }
+        Ok(())
+    }
 }
 
-/// The session token kept, if any (and readable).
+/// The session token kept, if any. (On Windows, a token 0.1.2 kept in its file is not read: that player signs in
+/// again, and the file goes.)
 pub fn stored_token(library: &Path) -> Option<String> {
-    let bytes = std::fs::read(token_path(library)).ok()?;
     #[cfg(windows)]
-    let bytes = dpapi::unprotect(&bytes).ok()?;
+    let bytes = {
+        let _ = std::fs::remove_file(token_path(library));
+        vault::read(&vault_name(library))?
+    };
+    #[cfg(not(windows))]
+    let bytes = std::fs::read(token_path(library)).ok()?;
     String::from_utf8(bytes).ok().filter(|t| !t.is_empty())
 }
 
 pub fn forget_token(library: &Path) {
     let _ = std::fs::remove_file(token_path(library));
+    #[cfg(windows)]
+    vault::delete(&vault_name(library));
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1237,9 +1266,9 @@ mod tests {
         assert_eq!(stored_token(&dir), None);
         store_token(&dir, "secret-token").unwrap();
         assert_eq!(stored_token(&dir).as_deref(), Some("secret-token"));
-        // not kept in the clear on Windows
+        // on Windows in Credential Manager, not in a file
         #[cfg(windows)]
-        assert!(!String::from_utf8_lossy(&std::fs::read(token_path(&dir)).unwrap()).contains("secret-token"));
+        assert!(!token_path(&dir).exists());
         forget_token(&dir);
         assert_eq!(stored_token(&dir), None);
         let _ = std::fs::remove_dir_all(&dir);

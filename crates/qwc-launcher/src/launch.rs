@@ -53,18 +53,38 @@ pub fn open_folder(dir: &Path) {
     let _ = Command::new(opener).arg(dir).spawn();
 }
 
-/// Open the web address `url` (http or https only) in the player's browser. On Windows through url.dll, which takes
-/// it as one argument: no shell reads its `&`s.
+/// Open the web address `url` (http or https only) in the player's browser: on Windows with ShellExecute, as programs
+/// open links (no command line, so no shell reads its `&`s); elsewhere with `xdg-open`.
 pub fn open_url(url: &str) -> Result<(), String> {
     if !(url.starts_with("https://") || url.starts_with("http://")) {
         return Err(format!("{url}: not a web address"));
     }
-    let spawned = if cfg!(windows) {
-        Command::new("rundll32").arg("url.dll,FileProtocolHandler").arg(url).spawn()
-    } else {
-        Command::new("xdg-open").arg(url).spawn()
-    };
-    spawned.map(|_| ()).map_err(|e| format!("The browser didn't open: {e}"))
+    #[cfg(windows)]
+    {
+        use windows::core::{HSTRING, PCWSTR};
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+        // SAFETY: plain strings for the call; its answer above 32 is success
+        let done = unsafe {
+            ShellExecuteW(
+                None,
+                &HSTRING::from("open"),
+                &HSTRING::from(url),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        if done.0 as isize > 32 {
+            Ok(())
+        } else {
+            Err(format!("The browser didn't open (Windows said {}).", done.0 as isize))
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        Command::new("xdg-open").arg(url).spawn().map(|_| ()).map_err(|e| format!("The browser didn't open: {e}"))
+    }
 }
 
 /// Start the game's front end from the boot on `profile`, its output to `log`.

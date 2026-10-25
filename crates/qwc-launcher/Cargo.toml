@@ -29,9 +29,15 @@ getrandom = "0.3"
 jpeg-decoder = { version = "0.3", default-features = false }
 jpeg-encoder = "0.6"
 
-# the session token kept encrypted for the Windows user (DPAPI, `account::store_token`)
+# the session token in Windows Credential Manager (`account::store_token`), and web addresses opened in the browser
+# (ShellExecute, `launch::open_url`)
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Security_Credentials",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [dev-dependencies]
 egui_kittest = { version = "0.37.0", features = ["wgpu"] }

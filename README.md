@@ -57,6 +57,13 @@ Claude Code), directed, tested and reviewed by the maintainer.
   - shows your recent matches, the news and updates;
   - **online play**: one player hosts, the other joins by address. There are no servers: the two games talk
     directly, and the launcher helps with routers (UPnP, NAT hole punching, a connection check).
+- **The pack store**, in the launcher's Packs page
+  - browse, search and install packs other players made, each reviewed before it is listed;
+  - **collections**: packs chosen and ordered to work together, installed in one go (your own order is kept to go
+    back to);
+  - sign in with Discord to rate packs, report problems, share your own packs for review, and publish collections;
+  - the store keeps no files: authors host their packs, and the launcher installs one only if the file is exactly
+    the one that was reviewed.
 - **The game**
   - the original's matches, House Cup, World Cup and challenges;
   - remastered lighting with shadows, fog and colour grading per stadium;
@@ -66,9 +73,13 @@ Claude Code), directed, tested and reviewed by the maintainer.
   - exports the game's textures and models for editing;
   - imports players and props from glTF onto the original skeleton, with their facial morphs, and checks them;
   - edits gameplay tuning, WGSL shaders, screen layouts and the HUD, with checks as you type;
-  - builds `.qwcpack` files to share.
+  - builds `.qwcpack` files to share, with the statement the pack store asks for (your own work, the licence,
+    the credits).
 
-Guides on how to mod the game with these tools are coming.
+Guides on how to mod the game with these tools are coming. Packs shared through the project follow its
+[content policy](CONTENT_POLICY.md): your own work only, nothing taken or made from the game's files.
+
+Join the project's Discord server: https://discord.gg/n7btswnbCy
 
 ## Installing
 
@@ -158,6 +169,10 @@ The full list, with versions, is in the `Cargo.toml` files and `Cargo.lock`.
 
 The remaster also talks to a few services:
 - **GitHub's releases API**, for the news and update check.
+- **The pack store** (`store.qwcr.workers.dev`), when you open the Packs page's Store, and **Discord**, when you sign
+  in to it. Signing in asks Discord only for your user id, name and avatar (never your email); the store keeps your
+  store name, your picture and your Discord id and username, the last two encrypted. Packs download from their
+  authors' own links.
 - **Public STUN servers** (Google's and Cloudflare's), when you play online: one small request each, to learn your
   public address.
 - **Your router (UPnP)**, when you host online: asked to forward the game's port while the game runs.

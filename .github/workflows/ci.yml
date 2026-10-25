@@ -14,12 +14,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       # Code and docs only: the game data under original/ is not needed for the unit tests. docs/ (in the private
-      # repo only) is there for the test that checks docs/feck_natives.md against the port.
+      # repo only) is there for the test that checks docs/feck_natives.md against the port; remastered/fonts for the
+      # launcher's signed-in page's test (its fonts).
       - uses: actions/checkout@v5
         with:
           sparse-checkout: |
             crates
             docs
+            remastered/fonts
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy

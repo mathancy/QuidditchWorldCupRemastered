@@ -15,7 +15,7 @@ use crate::style;
 #[derive(Default)]
 pub(super) struct PacksView {
     /// The installed packs by id, and the folders whose manifests did not read.
-    installed: BTreeMap<String, Pack>,
+    pub(super) installed: BTreeMap<String, Pack>,
     errors: Vec<String>,
     /// Each installed pack's slots, counted by kind ("46 texture, 3 movie").
     fills: BTreeMap<String, String>,
@@ -25,8 +25,13 @@ pub(super) struct PacksView {
     /// A `.qwcpack` being installed, a pack waiting for the removal to be confirmed, the last thing done.
     pub(super) installing: Option<Job<Pack>>,
     confirm_remove: Option<String>,
-    message: Option<(bool, String)>,
-    read: bool,
+    pub(super) message: Option<(bool, String)>,
+    pub(super) read: bool,
+    /// Whether the page shows the store instead of the installed packs, and the store's view.
+    pub(super) store_open: bool,
+    pub(super) store: super::store::StoreView,
+    /// The store's collections, saved orders and sharing.
+    pub(super) collections: super::collections::CollectionsView,
 }
 
 /// "46 texture, 3 movie" for a pack's slots.
@@ -46,7 +51,7 @@ fn counts(slots: &[String]) -> String {
 impl Launcher {
     /// Read the packs' folder and the profile again; every installed pack the profile does not list is put at the
     /// bottom, off.
-    fn refresh_packs(&mut self) {
+    pub(super) fn refresh_packs(&mut self) {
         let (installed, errors) = self.packs_profile().installed();
         for id in installed.keys() {
             if !self.profile.packs.iter().any(|e| &e.id == id) {
@@ -62,7 +67,7 @@ impl Launcher {
     }
 
     /// Write the profile after a change, and read the page again.
-    fn save_packs(&mut self, done: &str) {
+    pub(super) fn save_packs(&mut self, done: &str) {
         let result = self.profile_path().ok_or("no library folder".to_string()).and_then(|p| self.profile.write(&p));
         self.packs_view.message = Some(match result {
             Ok(()) => (true, format!("{done} The game uses it the next time it starts.")),
@@ -84,6 +89,20 @@ impl Launcher {
     pub(super) fn poll_packs(&mut self) {
         if let Some(r) = self.packs_view.installing.as_ref().and_then(Job::take) {
             self.packs_view.installing = None;
+            let listing = self.packs_view.store.installing.take();
+            match &r {
+                // from the store: told, so the player can rate it; a file not the one reviewed, reported
+                Ok(_) => {
+                    if let Some(l) = listing {
+                        self.installed_from_store(&[l]);
+                    }
+                }
+                Err(e) => {
+                    if let Some(l) = listing {
+                        self.report_changed(l, e);
+                    }
+                }
+            }
             match r {
                 Ok(p) => {
                     self.profile.put_on_top(&p.manifest.id);
@@ -118,6 +137,21 @@ impl Launcher {
             .color(style::DIM),
         );
         ui.add_space(6.0);
+        // the packs installed, or the store's
+        ui.horizontal(|ui| {
+            let v = &mut self.packs_view;
+            if ui.selectable_label(!v.store_open, RichText::new("Your packs").size(18.0)).clicked() {
+                v.store_open = false;
+            }
+            if ui.selectable_label(v.store_open, RichText::new("Store").size(18.0)).clicked() {
+                v.store_open = true;
+            }
+        });
+        ui.add_space(6.0);
+        if self.packs_view.store_open {
+            self.store_view(ui);
+            return;
+        }
         ui.horizontal(|ui| {
             let busy = self.packs_view.installing.is_some();
             if ui.add_enabled(!busy, style::primary_with(&art, "icon_download", "Install a pack...", 20.0)).clicked() {
@@ -143,6 +177,20 @@ impl Launcher {
                 if let Err(e) = crate::launch::studio() {
                     self.packs_view.message = Some((false, e));
                 }
+            }
+            if ui
+                .add(style::button_with(&art, "icon_download", "Submit to the store..."))
+                .on_hover_text("Share a pack you made in the pack store, after a review")
+                .clicked()
+            {
+                self.open_submit();
+            }
+            if ui
+                .add(style::button_with(&art, "icon_plus", "Share as a collection..."))
+                .on_hover_text("Share this order of your store packs in the pack store")
+                .clicked()
+            {
+                self.share_order(&ctx);
             }
             if busy {
                 ui.spinner();
@@ -252,6 +300,9 @@ impl Launcher {
                 }
             });
         }
+        ui.add_space(6.0);
+        self.saved_orders(ui);
+        self.share_dialog(&ctx);
         self.confirm_removal(&ctx);
     }
 

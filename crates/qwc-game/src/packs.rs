@@ -426,6 +426,7 @@ fn migrate_pack(packs: &Path, id: &str, name: &str, description: &str, from: &Pa
         source: None,
         requires: vec![],
         conflicts: vec![],
+        declaration: None,
     };
     std::fs::write(dest.join(qwc_packs::MANIFEST), m.to_text()).unwrap_or_else(|e| fail(e));
     println!("{id}: {} ({:.0} MB)", dest.display(), bytes as f64 / 1e6);

@@ -20,6 +20,9 @@ accepted = [
     # egui's default fonts (epaint_default_fonts)
     "OFL-1.1",
     "Ubuntu-font-1.0",
+    # the Independent JPEG Group's licence (jpeg-encoder, the launcher's profile pictures): permissive, asking that
+    # the documentation of a binary say it is based in part on their work, which this file does
+    "IJG",
 ]
 targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
 ignore-build-dependencies = true

@@ -1409,6 +1409,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00810f1d8b74be64b13dbf3db89ac67740615d6c891f0e7b6179326533011a07"
 
 [[package]]
+name = "jpeg-encoder"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b454d911ac55068f53495488d8ccd0646eaa540c033a28ee15b07838afafb01f"
+
+[[package]]
 name = "js-sys"
 version = "0.3.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2432,7 +2438,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-anim"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "qwc-assets",
  "qwc-formats",
@@ -2441,7 +2447,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-assets"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "intel_tex_2",
  "jpeg-decoder",
@@ -2452,7 +2458,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-audio"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "cpal",
  "qwc-assets",
@@ -2461,7 +2467,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-dump"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "qwc-formats",
  "serde_json",
@@ -2469,7 +2475,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-feck"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "qwc-anim",
  "qwc-assets",
@@ -2478,7 +2484,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-formats"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "regex",
  "serde_json",
@@ -2486,7 +2492,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-frontend"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "qwc-anim",
  "qwc-assets",
@@ -2500,7 +2506,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-game"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gilrs",
  "png 0.17.16",
@@ -2526,7 +2532,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-hud"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ron",
  "serde",
@@ -2534,10 +2540,13 @@ dependencies = [
 
 [[package]]
 name = "qwc-launcher"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "eframe",
  "egui_kittest",
+ "getrandom 0.3.4",
+ "jpeg-decoder",
+ "jpeg-encoder",
  "png 0.17.16",
  "qwc-feck",
  "qwc-formats",
@@ -2553,16 +2562,17 @@ dependencies = [
  "serde_json",
  "sha2",
  "ureq",
+ "windows",
  "winresource",
 ]
 
 [[package]]
 name = "qwc-net"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "qwc-packs"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "qwc-assets",
  "ron",
@@ -2573,7 +2583,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-render"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytemuck",
  "glam",
@@ -2588,7 +2598,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-settings"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ron",
  "serde",
@@ -2596,7 +2606,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-sim"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "libm",
  "qwc-assets",
@@ -2605,7 +2615,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-studio"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "eframe",
  "egui_kittest",
@@ -2628,7 +2638,7 @@ dependencies = [
 
 [[package]]
 name = "qwc-style"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "eframe",
  "png 0.17.16",
@@ -2636,14 +2646,14 @@ dependencies = [
 
 [[package]]
 name = "qwc-text"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "swash",
 ]
 
 [[package]]
 name = "qwc-video"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "openh264",
  "qwc-formats",

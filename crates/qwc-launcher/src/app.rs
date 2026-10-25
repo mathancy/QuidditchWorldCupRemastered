@@ -2,14 +2,18 @@
 //! the import), then the Play page (`home`), the Online page (`online`), the Packs page (`packs`), the Settings page
 //! (`settings`), the Saves page (`saves`) and the News page (`news`).
 
+mod account;
 mod chrome;
+mod collections;
 mod home;
 mod news;
 mod online;
 mod packs;
+mod review;
 mod saves;
 mod settings;
 mod shape;
+mod store;
 
 use std::path::{Path, PathBuf};
 use std::process::Child;
@@ -66,6 +70,10 @@ pub enum Page {
     Settings,
     Saves,
     News,
+    /// A player's profile in the pack store (yours, or a pack's author's).
+    Profile,
+    /// The store's reviewers' page: the queue and the reports.
+    Review,
 }
 
 pub struct Launcher {
@@ -99,6 +107,8 @@ pub struct Launcher {
     saves_view: saves::SavesView,
     news_view: news::NewsView,
     online_view: online::OnlineView,
+    account_view: account::AccountView,
+    review_view: review::ReviewView,
     /// Look for a new release on the first frame (the window's launcher, when the settings say so).
     news_soon: bool,
 }
@@ -138,6 +148,8 @@ impl Launcher {
             saves_view: saves::SavesView::default(),
             news_view: news::NewsView::default(),
             online_view: online::OnlineView::default(),
+            account_view: account::AccountView::default(),
+            review_view: review::ReviewView::default(),
             news_soon: false,
         };
         if l.ready() {
@@ -200,8 +212,16 @@ impl Launcher {
             self.check_releases(&ctx);
         }
         self.poll_news(&ctx);
+        self.poll_account(&ctx);
+        self.poll_collections(&ctx);
+        self.poll_review(&ctx);
         self.poll();
-        let installing = self.packs_view.installing.is_some() || self.news_view.busy() || self.online_view.busy();
+        let installing = self.packs_view.installing.is_some()
+            || self.news_view.busy()
+            || self.online_view.busy()
+            || self.account_view.busy()
+            || self.packs_view.collections.busy()
+            || self.review_view.busy();
         if self.checking.is_some() || self.importing.is_some() || self.running.is_some() || installing {
             ctx.request_repaint_after(std::time::Duration::from_millis(100));
         }
@@ -227,15 +247,20 @@ impl Launcher {
                     Page::Settings => self.settings(ui),
                     Page::Saves => self.saves(ui),
                     Page::News => self.news(ui),
+                    Page::Profile => self.profile_page(ui),
+                    Page::Review => self.review_page(ui),
                 });
             },
         );
+        self.submit_dialog(&ctx);
+        self.report_dialog(&ctx);
         chrome::frame(&ctx, &self.art);
     }
 
     /// The jobs' answers and the game's end.
     fn poll(&mut self) {
         self.poll_packs();
+        self.poll_store();
         self.poll_online();
         if let Some(r) = self.checking.as_ref().and_then(Job::take) {
             self.checking = None;
@@ -448,6 +473,14 @@ impl Launcher {
     /// Show these releases as if fetched (the screenshots).
     pub fn show_releases(&mut self, releases: Vec<crate::updates::Release>) {
         self.news_view.releases = Some(Ok(releases));
+    }
+
+    /// Open the Packs page's Store view on these packs as if fetched (the screenshots).
+    pub fn show_store(&mut self, packs: Vec<crate::store::Listed>) {
+        self.page = Page::Packs;
+        self.packs_view.store_open = true;
+        self.packs_view.store.looked = true;
+        self.packs_view.store.packs = packs;
     }
 
     /// Whether a check or an import is still working (or about to start).

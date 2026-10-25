@@ -53,6 +53,20 @@ pub fn open_folder(dir: &Path) {
     let _ = Command::new(opener).arg(dir).spawn();
 }
 
+/// Open the web address `url` (http or https only) in the player's browser. On Windows through url.dll, which takes
+/// it as one argument: no shell reads its `&`s.
+pub fn open_url(url: &str) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err(format!("{url}: not a web address"));
+    }
+    let spawned = if cfg!(windows) {
+        Command::new("rundll32").arg("url.dll,FileProtocolHandler").arg(url).spawn()
+    } else {
+        Command::new("xdg-open").arg(url).spawn()
+    };
+    spawned.map(|_| ()).map_err(|e| format!("The browser didn't open: {e}"))
+}
+
 /// Start the game's front end from the boot on `profile`, its output to `log`.
 pub fn play(profile: &Path, log: &Path) -> Result<Child, String> {
     let exe = game_exe().ok_or("qwc-game is not beside the launcher")?;

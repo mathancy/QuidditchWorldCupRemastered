@@ -24,6 +24,14 @@ serde = { version = "1", features = ["derive"] }
 ron = "0.12"
 serde_json = { workspace = true }
 semver = "1"
+# the pack store's account: the sign-in's secrets, and a picture made ready to upload (`account`)
+getrandom = "0.3"
+jpeg-decoder = { version = "0.3", default-features = false }
+jpeg-encoder = "0.6"
+
+# the session token kept encrypted for the Windows user (DPAPI, `account::store_token`)
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 
 [dev-dependencies]
 egui_kittest = { version = "0.37.0", features = ["wgpu"] }

@@ -610,7 +610,14 @@ impl Launcher {
                 ),
             ],
         );
-        let button = Rect::from_min_size(pos2(rect.right() - 290.0, rect.center().y - 22.0), vec2(266.0, 44.0));
+        // the pack store's account: the picture, the name, Log in or Log out
+        let third = rect.left() + rect.width() * 0.6;
+        p.line_segment(
+            [pos2(third - 20.0, rect.top() + 14.0), pos2(third - 20.0, rect.bottom() - 14.0)],
+            Stroke::new(1.0, style::GOLD_DEEP),
+        );
+        self.account_slot(ui, third, rect);
+        let button = Rect::from_min_size(pos2(rect.right() - 232.0, rect.center().y - 22.0), vec2(208.0, 44.0));
         ui.scope_builder(egui::UiBuilder::new().max_rect(button), |ui| {
             if ornate::button(ui, &self.art, "Game files", button.size(), Kind::Plain, 17.0, true, true).clicked() {
                 if let Some(d) = &self.profile.data {

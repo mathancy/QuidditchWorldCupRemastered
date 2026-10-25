@@ -144,4 +144,159 @@ stadium japan"
     let mut home = Launcher::new(&root, Some(home_lib.clone()));
     home.show_releases(releases());
     shoot(out, "home_notes", home);
+
+    // the Packs page's Store view, from a store running on this computer (`store/seed/dev.sql`) when QWC_STORE_URL
+    // names one
+    if let Ok(base) = std::env::var("QWC_STORE_URL") {
+        let page = qwc_launcher::store::browse(&base, &Default::default()).expect("the store");
+        let mut store = Launcher::new(&root, Some(home_lib.clone()));
+        store.show_store(page.packs.clone());
+        shoot(out, "packs_store", store);
+        accounts(out, &root, home_lib, page.packs);
+    }
+}
+
+/// A made-up round picture: a gold disc on navy, `side` pixels.
+fn made_up_picture(side: u32) -> Vec<u8> {
+    (0..side * side)
+        .flat_map(|i| {
+            let (x, y) = ((i % side) as f32 - side as f32 / 2.0, (i / side) as f32 - side as f32 / 2.0);
+            if x * x + y * y < (side as f32 / 3.5).powi(2) {
+                [0xd4, 0xa6, 0x4a, 255]
+            } else {
+                [0x1b, 0x27, 0x40, 255]
+            }
+        })
+        .collect()
+}
+
+/// The pack store's account: the bottom strip signed in and out, and the Profile page, yours and someone else's.
+fn accounts(out: &Path, root: &Path, home_lib: &Path, packs: Vec<qwc_launcher::store::Listed>) {
+    let me: qwc_launcher::account::Me = serde_json::from_value(serde_json::json!({
+        "id": "acct-sam-0001", "name": "Seeker Sam", "discord_username": "seeker_sam", "show_discord": true,
+        "uploaded_avatar": false, "role": "reviewer", "joined": "2026-10-24T20:00:00Z", "name_change_after": null
+    }))
+    .unwrap();
+    let picture = || vec![("acct-sam-0001".to_string(), made_up_picture(128), 128, 128)];
+    let mut home = Launcher::new(root, Some(home_lib.to_path_buf()));
+    home.show_signed_in(Some(("token".into(), me.clone())), picture());
+    shoot(out, "home_signed_in", home);
+    let mut home = Launcher::new(root, Some(home_lib.to_path_buf()));
+    home.show_signed_in(None, vec![]);
+    shoot(out, "home_signed_out", home);
+
+    let mut own: qwc_launcher::account::Profile = serde_json::from_value(serde_json::json!({
+        "id": "acct-sam-0001", "name": "Seeker Sam", "discord_username": "seeker_sam",
+        "joined": "2026-10-24T20:00:00Z", "role": "reviewer", "packs": []
+    }))
+    .unwrap();
+    own.packs = packs.into_iter().take(2).collect();
+    let mut mine = Launcher::new(root, Some(home_lib.to_path_buf()));
+    mine.show_profile(own.clone(), Some(("token".into(), me)), picture());
+    shoot_sized(out, "profile_own", mine, 1100.0);
+    let mut theirs = Launcher::new(root, Some(home_lib.to_path_buf()));
+    theirs.show_profile(own.clone(), None, picture());
+    shoot(out, "profile_other", theirs);
+
+    // collections: the Store's list with one opened, a profile's, and the Your packs view's saved orders
+    let summary = |id: &str, name: &str, packs: u32, complete: bool| {
+        serde_json::json!({ "id": id, "name": name, "description": "Every stadium at night, a quieter HUD, and the old rules.",
+            "author": { "id": "acct-sam-0001", "name": "Seeker Sam" }, "revision": 2, "packs": packs, "complete": complete,
+            "updated": "2026-10-24T21:00:00Z" })
+    };
+    let item = |id: &str, name: &str, version: &str, enabled: bool, listed: bool| {
+        serde_json::json!({ "enabled": enabled, "listing": 1, "id": id, "name": name, "version": version, "kind": "Visual",
+            "engine": ">=0.1", "url": "https://x/p", "sha256": "a", "size": 1, "listed": listed })
+    };
+    let list: Vec<qwc_launcher::store::CollectionSummary> = serde_json::from_value(serde_json::json!([
+        summary("coll-night-01", "Night matches", 3, true),
+        summary("coll-classic-1", "Classic feel", 2, false),
+    ]))
+    .unwrap();
+    let mut opened = serde_json::json!({ "items": [
+        item("ana.floodlights", "Floodlit night matches", "1.1.0", true, true),
+        item("qwcr.clean-hud", "Clean HUD", "1.0.0", true, true),
+        item("bo.classic-rules", "Classic rules", "0.3.0", false, true),
+    ] });
+    opened
+        .as_object_mut()
+        .unwrap()
+        .extend(summary("coll-night-01", "Night matches", 3, true).as_object().unwrap().clone());
+    let opened: qwc_launcher::store::Collection = serde_json::from_value(opened).unwrap();
+    let mut store = Launcher::new(root, Some(home_lib.to_path_buf()));
+    store.show_collections(list.clone(), vec![opened]);
+    shoot(out, "store_collections", store);
+    let mut with = own;
+    with.collections = list;
+    let mut theirs = Launcher::new(root, Some(home_lib.to_path_buf()));
+    theirs.show_profile(with, None, picture());
+    shoot_sized(out, "profile_collections", theirs, 1100.0);
+    let mut orders = Launcher::new(root, Some(home_lib.to_path_buf()));
+    orders.show_saved_orders(&["My usual", "Before Night matches"]);
+    shoot_sized(out, "packs_saved_orders", orders, 1100.0);
+    review(out, root, home_lib, me_for_review());
+}
+
+fn me_for_review() -> (String, qwc_launcher::account::Me) {
+    let me = serde_json::from_value(serde_json::json!({
+        "id": "acct-sam-0001", "name": "Seeker Sam", "discord_username": "seeker_sam", "show_discord": true,
+        "uploaded_avatar": false, "role": "admin", "joined": "2026-10-24T20:00:00Z", "name_change_after": null
+    }))
+    .unwrap();
+    ("token".to_string(), me)
+}
+
+/// Reviewing, rating and submitting: the Review page, the store's stars and Report, your submissions, the dialog.
+fn review(out: &Path, root: &Path, home_lib: &Path, me: (String, qwc_launcher::account::Me)) {
+    let pending: Vec<qwc_launcher::account::Pending> = serde_json::from_value(serde_json::json!([
+        { "listing": 6, "id": "bo.starry-sky", "name": "Starry sky", "version": "0.2.0", "kind": "Visual", "engine": ">=0.1",
+          "requires": [], "conflicts": [], "description": "A night sky with stars over every stadium.", "licence": "CC BY 4.0",
+          "url": "https://github.com/bo/starry-sky/releases/download/v0.2.0/bo.starry-sky-0.2.0.qwcpack",
+          "sha256": "f", "size": 2400000, "screenshots": ["https://example.invalid/sky.png"],
+          "provenance": { "own_work": true, "recipes": false, "credits": "Bo; the sky photographs are mine" },
+          "submitted": "2026-10-24T09:00:00Z", "author": { "id": "dev-bo", "name": "Bo" }, "listed_before": 0 },
+        { "listing": 7, "id": "ana.floodlights", "name": "Floodlit night matches", "version": "1.2.0", "kind": "Visual",
+          "engine": ">=0.1", "description": "Now with lens flares.", "licence": "CC BY", "url": "https://github.com/ana/f/releases/download/v1.2.0/f.qwcpack",
+          "sha256": "1", "size": 2600000, "provenance": { "own_work": true, "recipes": true, "credits": "Ana" },
+          "submitted": "2026-10-24T11:00:00Z", "author": { "id": "dev-ana", "name": "Ana" }, "listed_before": 2 }
+    ]))
+    .unwrap();
+    let reports: Vec<qwc_launcher::account::OpenReport> = serde_json::from_value(serde_json::json!([
+        { "id": 1, "target_kind": "listing", "target_id": "3", "reason": "broken", "note": "The keepers never save anything with this on.",
+          "at": "2026-10-24T12:00:00Z", "reporter": "Ana", "about": "Classic rules 0.3.0", "state": "approved" }
+    ]))
+    .unwrap();
+    let checked = qwc_launcher::store::Checked {
+        file: std::path::PathBuf::new(),
+        manifest: qwc_packs::Manifest::new("bo.starry-sky", "Starry sky"),
+        fills: "12 texture, 1 look".into(),
+        problems: vec![(
+            qwc_packs::Severity::Warning,
+            "textures/sky_dome.png: 4096 x 4096, larger than the remaster draws it".into(),
+        )],
+    };
+    let mut page = Launcher::new(root, Some(home_lib.to_path_buf()));
+    page.show_review(me.clone(), pending, reports, Some(checked));
+    shoot_sized(out, "review", page, 1500.0);
+
+    if let Ok(base) = std::env::var("QWC_STORE_URL") {
+        // the store's packs with your rating and Report
+        let packs = qwc_launcher::store::browse(&base, &Default::default()).expect("the store").packs;
+        let mut store = Launcher::new(root, Some(home_lib.to_path_buf()));
+        store.show_mine(me.clone(), vec![("ana.floodlights".into(), 4)], vec![]);
+        store.show_store(packs);
+        shoot(out, "store_rating", store);
+        // the dialog on a sample pack (without its statement: not ready)
+        let sample =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../store/.dev-files/files/bo.starry-sky-0.2.0.qwcpack");
+        if sample.is_file() {
+            let mut submit = Launcher::new(root, Some(home_lib.to_path_buf()));
+            submit.show_mine(me.clone(), vec![], vec![]);
+            submit.show_submit(
+                sample,
+                "https://github.com/bo/starry-sky/releases/download/v0.2.0/bo.starry-sky-0.2.0.qwcpack",
+            );
+            shoot(out, "submit", submit);
+        }
+    }
 }

@@ -126,6 +126,60 @@ pub fn open_with_system(path: &Path) {
     };
 }
 
+/// The licences offered for the store's statement; any other can be typed in the credits.
+const LICENCES: [&str; 6] =
+    ["All rights reserved", "CC BY 4.0", "CC BY-SA 4.0", "CC BY-NC 4.0", "CC0 1.0", "Other (in the credits)"];
+
+/// The pack's statement for the pack store (`Declaration`, `CONTENT_POLICY.md`): optional, kept in the manifest
+/// only once something in it is set.
+fn store_declaration(pe: &mut PackEditor, ui: &mut egui::Ui) {
+    ui.add_space(6.0);
+    ui.label(RichText::new("For the pack store").strong());
+    ui.label(
+        RichText::new(
+            "Only needed to share the pack in the store, which lists packs with this statement ticked. Packs for \
+             yourself don't need it.",
+        )
+        .small(),
+    );
+    let mut d = pe.manifest.declaration.clone().unwrap_or_default();
+    let before = d.clone();
+    ui.checkbox(&mut d.own_work, "Everything in this pack is our own work, or used with permission and credited below")
+        .on_hover_text(
+            "Nothing from the game's files or made from them (upscales, edits, redraws, extracted models), and no \
+             logos, names or artwork of Electronic Arts, Warner Bros. or their partners",
+        );
+    ui.checkbox(&mut d.recipes, "Some of it is recipes applied to the player's own game files")
+        .on_hover_text("Instructions such as crops or filters, carrying none of the game's files");
+    ui.horizontal(|ui| {
+        let l = ui.label("Licence");
+        let shown = if d.licence.is_empty() { "Choose..." } else { d.licence.as_str() };
+        egui::ComboBox::from_id_salt("store licence")
+            .selected_text(shown.to_string())
+            .show_ui(ui, |ui| {
+                for lic in LICENCES {
+                    ui.selectable_value(&mut d.licence, lic.to_string(), lic);
+                }
+            })
+            .response
+            .labelled_by(l.id);
+    });
+    let l = ui.label("Credits and permissions").id;
+    ui.add(
+        egui::TextEdit::multiline(&mut d.credits)
+            .desired_rows(2)
+            .desired_width(f32::INFINITY)
+            .hint_text("Who made what; for anything not your own, whose it is and their permission"),
+    )
+    .labelled_by(l);
+    if d != before {
+        pe.manifest.declaration = (d != qwc_packs::Declaration::default()).then_some(d);
+    }
+    if let Some(why) = pe.manifest.declaration.as_ref().and_then(qwc_packs::Declaration::missing) {
+        ui.colored_label(qwc_style::WARN, format!("Not ready for the store: {why}."));
+    }
+}
+
 /// The next version: `which` 0 the patch, 1 the minor, 2 the major.
 fn bump(version: &str, which: usize) -> String {
     let Ok(mut v) = semver::Version::parse(version) else { return version.to_string() };
@@ -456,6 +510,7 @@ fn side(pe: &mut PackEditor, ui: &mut egui::Ui) {
     let l = ui.label("Description").id;
     ui.add(egui::TextEdit::multiline(&mut pe.manifest.description).desired_rows(3).desired_width(f32::INFINITY))
         .labelled_by(l);
+    store_declaration(pe, ui);
     ui.horizontal(|ui| {
         if ui.add_enabled(pe.dirty(), egui::Button::new("Save    Ctrl+S")).clicked() {
             pe.save();

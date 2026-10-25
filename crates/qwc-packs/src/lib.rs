@@ -20,7 +20,7 @@ use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
 
-pub use archive::{build, install};
+pub use archive::{build, install, manifest as archive_manifest};
 
 /// The remaster's version, which a pack's `engine` requirement is checked against.
 pub const ENGINE: &str = env!("CARGO_PKG_VERSION");
@@ -180,6 +180,42 @@ pub struct Manifest {
     /// Packs' ids that must not be on with this one.
     #[serde(default)]
     pub conflicts: Vec<String>,
+    /// The authors' statement for the pack store (`docs/PACK_STORE.md`): where its content comes from, and the
+    /// licence it is shared under. Not needed to install or play a pack; the store lists only packs that make it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declaration: Option<Declaration>,
+}
+
+/// A pack's statement for the pack store (the content rules, `CONTENT_POLICY.md`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename = "Declaration")]
+pub struct Declaration {
+    /// Everything in the pack is the authors' own work, or used with permission and credited in `credits`: no file
+    /// of the game nor anything made from one (upscales, edits, redraws, extracted models), and no logo, name or
+    /// artwork of Electronic Arts, Warner Bros. or their partners.
+    pub own_work: bool,
+    /// Some of it is recipes: instructions applied to the player's own game files, carrying none of them.
+    #[serde(default)]
+    pub recipes: bool,
+    /// The licence it is shared under (`CC BY 4.0`, `All rights reserved`, ...).
+    #[serde(default)]
+    pub licence: String,
+    /// Who made what, and the permissions for anything that is not the authors' own.
+    #[serde(default)]
+    pub credits: String,
+}
+
+impl Declaration {
+    /// What keeps the store from listing a pack with this statement, if anything.
+    pub fn missing(&self) -> Option<&'static str> {
+        if !self.own_work {
+            Some("the statement that everything in it is the authors' own work is not ticked")
+        } else if self.licence.trim().is_empty() {
+            Some("no licence")
+        } else {
+            None
+        }
+    }
 }
 
 impl Manifest {
@@ -196,6 +232,7 @@ impl Manifest {
             source: None,
             requires: vec![],
             conflicts: vec![],
+            declaration: None,
         }
     }
 
@@ -542,6 +579,16 @@ pub struct Profile {
     pub packs_dir: Option<PathBuf>,
     /// The packs, the highest first. Packs in the folder that are not listed are off.
     pub packs: Vec<Entry>,
+    /// Orders of packs kept to go back to: the player's own, or the one before a collection was applied.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub loadouts: Vec<Loadout>,
+}
+
+/// An order of packs kept under a name (`Profile::loadouts`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Loadout {
+    pub name: String,
+    pub packs: Vec<Entry>,
 }
 
 impl Profile {
@@ -604,6 +651,45 @@ impl Profile {
     pub fn put_on_top(&mut self, id: &str) {
         self.packs.retain(|e| e.id != id);
         self.packs.insert(0, Entry { id: id.to_string(), enabled: true });
+    }
+
+    /// Keep the current order as loadout `name`, replacing one of that name.
+    pub fn save_loadout(&mut self, name: &str) {
+        let packs = self.packs.clone();
+        match self.loadouts.iter_mut().find(|l| l.name == name) {
+            Some(l) => l.packs = packs,
+            None => self.loadouts.push(Loadout { name: name.to_string(), packs }),
+        }
+    }
+
+    /// Use `order` (the highest first): its packs in its order, each on or off as it says; every other pack the
+    /// profile listed goes below them, off. A collection applied, or a loadout used.
+    pub fn apply_order(&mut self, order: &[Entry]) {
+        let mut packs: Vec<Entry> = Vec::new();
+        for e in order {
+            if !packs.iter().any(|p| p.id == e.id) {
+                packs.push(e.clone());
+            }
+        }
+        for e in &self.packs {
+            if !packs.iter().any(|p| p.id == e.id) {
+                packs.push(Entry { id: e.id.clone(), enabled: false });
+            }
+        }
+        self.packs = packs;
+    }
+
+    /// Use loadout `name`; whether there is one.
+    pub fn use_loadout(&mut self, name: &str) -> bool {
+        let Some(order) = self.loadouts.iter().find(|l| l.name == name).map(|l| l.packs.clone()) else {
+            return false;
+        };
+        self.apply_order(&order);
+        true
+    }
+
+    pub fn remove_loadout(&mut self, name: &str) {
+        self.loadouts.retain(|l| l.name != name);
     }
 
     /// Turn a pack on or off (listed at the top when it was not).
@@ -856,6 +942,7 @@ mod tests {
             source: None,
             requires: vec![],
             conflicts: vec![],
+            declaration: None,
         }
     }
 
@@ -870,6 +957,45 @@ mod tests {
             std::fs::write(f, text).unwrap();
         }
         dir
+    }
+
+    #[test]
+    fn loadouts() {
+        let e = |id: &str, enabled: bool| Entry { id: id.into(), enabled };
+        let mut p = Profile { packs: vec![e("me.a", true), e("me.b", false), e("me.c", true)], ..Profile::default() };
+        // an old profile is written as before, without loadouts
+        assert!(!ron::ser::to_string(&p).unwrap().contains("loadouts"));
+        p.save_loadout("Mine");
+        // a collection's order: its packs first as it says, the others below, off
+        p.apply_order(&[e("me.c", true), e("me.x", true), e("me.a", false)]);
+        assert_eq!(p.packs, [e("me.c", true), e("me.x", true), e("me.a", false), e("me.b", false)]);
+        // and back
+        assert!(p.use_loadout("Mine"));
+        assert_eq!(p.packs, [e("me.a", true), e("me.b", false), e("me.c", true), e("me.x", false)]);
+        assert!(!p.use_loadout("Nobody's"));
+        // read back from RON
+        let text = ron::ser::to_string(&p).unwrap();
+        assert_eq!(ron::from_str::<Profile>(&text).unwrap(), p);
+        p.remove_loadout("Mine");
+        assert!(p.loadouts.is_empty());
+    }
+
+    #[test]
+    fn the_store_declaration() {
+        // a manifest without one is written as before
+        let plain = Manifest::new("me.night", "Night");
+        assert!(!plain.to_text().contains("declaration"));
+        assert_eq!(Manifest::parse(&plain.to_text()).unwrap(), plain);
+        // with one, read back the same
+        let mut m = plain.clone();
+        m.declaration =
+            Some(Declaration { own_work: true, recipes: true, licence: "CC BY 4.0".into(), credits: "Me".into() });
+        assert_eq!(Manifest::parse(&m.to_text()).unwrap(), m);
+        assert_eq!(m.declaration.as_ref().unwrap().missing(), None);
+        let unticked = Declaration { licence: "CC0 1.0".into(), ..Declaration::default() };
+        assert!(unticked.missing().unwrap().contains("own work"));
+        let no_licence = Declaration { own_work: true, ..Declaration::default() };
+        assert_eq!(no_licence.missing(), Some("no licence"));
     }
 
     #[test]

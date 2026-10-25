@@ -63,17 +63,28 @@ pub fn build(dir: &Path, out: &Path) -> Result<(PathBuf, Vec<String>), String> {
     Ok((file, warnings))
 }
 
+/// The manifest at the top of `zip` (the `.qwcpack` at `file`).
+fn read(zip: &mut zip::ZipArchive<File>, file: &Path) -> Result<Manifest, String> {
+    let fail = |e: &dyn std::fmt::Display| format!("{}: {e}", file.display());
+    let mut m = zip.by_name(MANIFEST).map_err(|_| fail(&format!("no {MANIFEST} at the top")))?;
+    let mut text = String::new();
+    m.read_to_string(&mut text).map_err(|e| fail(&e))?;
+    Manifest::parse(&text).map_err(|e| fail(&e))
+}
+
+/// The manifest of the `.qwcpack` at `file`, without installing it.
+pub fn manifest(file: &Path) -> Result<Manifest, String> {
+    let fail = |e: &dyn std::fmt::Display| format!("{}: {e}", file.display());
+    let mut zip = zip::ZipArchive::new(File::open(file).map_err(|e| fail(&e))?).map_err(|e| fail(&e))?;
+    read(&mut zip, file)
+}
+
 /// Unzip the `.qwcpack` at `file` into `packs_dir/<id>`, replacing an older copy of the same pack. Every member must
 /// stay inside the pack's folder, and the manifest must be at its top. Answers the pack installed.
 pub fn install(file: &Path, packs_dir: &Path) -> Result<Pack, String> {
     let fail = |e: &dyn std::fmt::Display| format!("{}: {e}", file.display());
     let mut zip = zip::ZipArchive::new(File::open(file).map_err(|e| fail(&e))?).map_err(|e| fail(&e))?;
-    let manifest = {
-        let mut m = zip.by_name(MANIFEST).map_err(|_| fail(&format!("no {MANIFEST} at the top")))?;
-        let mut text = String::new();
-        m.read_to_string(&mut text).map_err(|e| fail(&e))?;
-        Manifest::parse(&text).map_err(|e| fail(&e))?
-    };
+    let manifest = read(&mut zip, file)?;
     std::fs::create_dir_all(packs_dir).map_err(|e| format!("{}: {e}", packs_dir.display()))?;
     let dest = packs_dir.join(&manifest.id);
     // unpacked beside, then swapped in, so a bad file leaves the installed copy as it was
@@ -132,6 +143,7 @@ mod tests {
             source: None,
             requires: vec![],
             conflicts: vec![],
+            declaration: None,
         };
         std::fs::write(src.join(MANIFEST), m.to_text()).unwrap();
         std::fs::write(src.join("movies/wb.mp4"), [7u8; 1000]).unwrap();

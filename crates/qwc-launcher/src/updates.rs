@@ -183,12 +183,67 @@ pub fn checksums(text: &str) -> HashMap<String, String> {
         .collect()
 }
 
-fn agent() -> ureq::Agent {
+pub(crate) fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_global(Some(std::time::Duration::from_secs(30)))
         .user_agent(concat!("qwc-launcher/", env!("CARGO_PKG_VERSION")))
         .build()
         .into()
+}
+
+/// Download `url` to `file` (written as `file.part`, renamed once whole), keeping it only if its SHA-256 is `sha256`
+/// and, when given, it is exactly `size` bytes; a larger file is stopped as soon as it passes `size`. `progress`
+/// counts the bytes, and its cancel stops the download. The releases' installers and the store's packs.
+pub(crate) fn fetch_checked(
+    url: &str,
+    file: &Path,
+    size: Option<u64>,
+    sha256: &str,
+    progress: &Progress,
+) -> Result<(), String> {
+    let name = file.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+    let part = file.with_file_name(format!("{name}.part"));
+    let mut res = agent().get(url).call().map_err(|e| e.to_string())?;
+    progress.total.store(size.or_else(|| res.body().content_length()).unwrap_or(0), Ordering::Relaxed);
+    progress.done.store(0, Ordering::Relaxed);
+    let mut body = res.body_mut().with_config().limit(4 << 30).reader();
+    let mut out = std::fs::File::create(&part).map_err(|e| format!("{}: {e}", part.display()))?;
+    let (mut h, mut buf, mut written) = (Sha256::new(), vec![0u8; 1 << 16], 0u64);
+    let failed = |out: std::fs::File, why: String| {
+        drop(out);
+        let _ = std::fs::remove_file(&part);
+        Err(why)
+    };
+    loop {
+        let n = match body.read(&mut buf) {
+            Ok(n) => n,
+            Err(e) => return failed(out, e.to_string()),
+        };
+        if n == 0 {
+            break;
+        }
+        written += n as u64;
+        if size.is_some_and(|s| written > s) {
+            return failed(out, format!("{name} is larger than the file reviewed: not installed"));
+        }
+        h.update(&buf[..n]);
+        if let Err(e) = out.write_all(&buf[..n]) {
+            return failed(out, e.to_string());
+        }
+        progress.done.fetch_add(n as u64, Ordering::Relaxed);
+        if progress.cancel.load(Ordering::Relaxed) {
+            return failed(out, "stopped".into());
+        }
+    }
+    if let Some(s) = size.filter(|&s| s != written) {
+        return failed(out, format!("{name} is {written} bytes, not the {s} expected: not installed"));
+    }
+    let got: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    if !got.eq_ignore_ascii_case(sha256) {
+        return failed(out, format!("{name} does not match its checksum: not installed"));
+    }
+    drop(out);
+    std::fs::rename(&part, file).map_err(|e| format!("{}: {e}", file.display()))
 }
 
 /// The releases, fetched.
@@ -217,34 +272,7 @@ pub fn download(release: &Release, dir: &Path, progress: &Progress) -> Result<Pa
         checksums(&text).remove(&asset.name).ok_or_else(|| format!("SHA256SUMS does not list {}", asset.name))?;
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let file = dir.join(&asset.name);
-    let part = dir.join(format!("{}.part", asset.name));
-    let mut res = agent.get(&asset.url).call().map_err(|e| e.to_string())?;
-    progress.total.store(asset.size, Ordering::Relaxed);
-    progress.done.store(0, Ordering::Relaxed);
-    let mut body = res.body_mut().with_config().limit(4 << 30).reader();
-    let mut out = std::fs::File::create(&part).map_err(|e| format!("{}: {e}", part.display()))?;
-    let (mut h, mut buf) = (Sha256::new(), vec![0u8; 1 << 16]);
-    loop {
-        let n = body.read(&mut buf).map_err(|e| e.to_string())?;
-        if n == 0 {
-            break;
-        }
-        h.update(&buf[..n]);
-        out.write_all(&buf[..n]).map_err(|e| e.to_string())?;
-        progress.done.fetch_add(n as u64, Ordering::Relaxed);
-        if progress.cancel.load(Ordering::Relaxed) {
-            drop(out);
-            let _ = std::fs::remove_file(&part);
-            return Err("stopped".into());
-        }
-    }
-    drop(out);
-    let got: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
-    if got != want {
-        let _ = std::fs::remove_file(&part);
-        return Err(format!("{} does not match its checksum: not installed", asset.name));
-    }
-    std::fs::rename(&part, &file).map_err(|e| format!("{}: {e}", file.display()))?;
+    fetch_checked(&asset.url, &file, Some(asset.size), &want, progress)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

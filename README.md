@@ -5,13 +5,26 @@
 <h1 align="center">Quidditch World Cup Remastered</h1>
 
 <p align="center">
-  A modder-friendly rebuild of <i>Harry Potter: Quidditch World Cup</i> (EA, 2003) for today's PCs:<br>
-  the original game decompiled, translated to Rust, and opened up for modding.
+  <i>Quidditch World Cup Remastered</i> is an unofficial, community-developed modding platform<br>
+  and modern runtime for the original 2003 PC game.
 </p>
 
 > [!WARNING]
 > **This project is VERY much a work in progress.** Expect missing features, bugs, crashes and big changes
 > between versions. Save files and packs made today may not work with later releases.
+>
+> **The project is not a standalone game.** The platform provides a Rust-based runtime, launcher, resource-pack
+> management and modding tools. It does not include the original game's textures, models, animations, audio,
+> cinematics or other proprietary game assets. To play, users **must** supply their own installation of the
+> original PC game. The launcher imports the required files locally, and the runtime uses those files to
+> render and operate the game.
+> 
+> **Without the original game assets, the platform cannot provide a playable game.** The project is intended to
+> extend and modernise an existing installation, providing new rendering capabilities, mod support, and
+> quality-of-life improvements without redistributing the original game's content.
+>
+> This is an independent fan project and is not affiliated with or endorsed by Electronic Arts, Warner Bros. or
+> the Harry Potter rights holders.
 >
 > **Resource packs (the remastered textures, models, movies and layouts) are not publicly available yet.** The
 > releases contain the engine, the launcher and the modding tools only. Out of the box the game plays as the

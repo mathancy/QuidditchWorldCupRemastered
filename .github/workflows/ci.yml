@@ -15,9 +15,11 @@ jobs:
     steps:
       # Code and docs only: the game data under original/ is not needed for the unit tests. docs/ (in the private
       # repo only) is there for the test that checks docs/feck_natives.md against the port; remastered/fonts for the
-      # launcher's signed-in page's test (its fonts).
+      # launcher's signed-in page's test (its fonts). The fonts are LFS files here (about 2.5 MB), and qwc-text's tests
+      # read them once fonts.txt is there, so LFS is fetched; the public repo holds them as plain files.
       - uses: actions/checkout@v5
         with:
+          lfs: true
           sparse-checkout: |
             crates
             docs

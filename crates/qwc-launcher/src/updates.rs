@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -185,7 +186,26 @@ pub fn checksums(text: &str) -> HashMap<String, String> {
 
 pub(crate) fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
-        .timeout_global(Some(std::time::Duration::from_secs(30)))
+        .timeout_global(Some(Duration::from_secs(30)))
+        .user_agent(concat!("qwc-launcher/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .into()
+}
+
+/// How long a file's download may wait for its next bytes before it is given up.
+const FILE_IDLE: Duration = Duration::from_secs(60);
+
+/// The agent for files: no limit on the whole download (a 400 MB pack on a slow line takes many minutes), but 30 s
+/// each to find the host, connect and be answered, and `idle` at most between the body's bytes, so a stalled
+/// download fails rather than hangs.
+fn file_agent(idle: Duration) -> ureq::Agent {
+    let step = Some(Duration::from_secs(30));
+    ureq::Agent::config_builder()
+        .timeout_resolve(step)
+        .timeout_connect(step)
+        .timeout_send_request(step)
+        .timeout_recv_response(step)
+        .timeout_per_read(Some(idle))
         .user_agent(concat!("qwc-launcher/", env!("CARGO_PKG_VERSION")))
         .build()
         .into()
@@ -201,9 +221,20 @@ pub(crate) fn fetch_checked(
     sha256: Option<&str>,
     progress: &Progress,
 ) -> Result<(String, u64), String> {
+    fetch_with(&file_agent(FILE_IDLE), url, file, size, sha256, progress)
+}
+
+fn fetch_with(
+    agent: &ureq::Agent,
+    url: &str,
+    file: &Path,
+    size: Option<u64>,
+    sha256: Option<&str>,
+    progress: &Progress,
+) -> Result<(String, u64), String> {
     let name = file.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned());
     let part = file.with_file_name(format!("{name}.part"));
-    let mut res = agent().get(url).call().map_err(|e| e.to_string())?;
+    let mut res = agent.get(url).call().map_err(|e| e.to_string())?;
     // a share link that answers with its page (a sign-in, a quota or virus-scan notice), not the file
     let kind = res.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_ascii_lowercase();
     if kind.starts_with("text/html") {
@@ -355,5 +386,59 @@ for today.
         assert_eq!(sums.get("QWCRemastered-0.2.0-setup.exe"), Some(&a));
         assert_eq!(sums.get("binary.AppImage"), Some(&a));
         assert_eq!(sums.len(), 2);
+    }
+
+    /// A local file 4000 bytes long, sent in four parts `gap` apart, then the connection held open for `hold`.
+    fn trickled(gap: Duration, parts: usize, hold: Duration) -> String {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://127.0.0.1:{}/p.qwcpack", listener.local_addr().unwrap().port());
+        std::thread::spawn(move || {
+            let (mut s, _) = listener.accept().unwrap();
+            let _ = s.read(&mut [0u8; 4096]);
+            let _ = s.write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: 4000\r\n\r\n",
+            );
+            for _ in 0..parts {
+                std::thread::sleep(gap);
+                let _ = s.write_all(&[7u8; 1000]);
+            }
+            std::thread::sleep(hold);
+        });
+        url
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("qwc-launcher-updates-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn a_slow_download_finishes() {
+        // longer in all than the idle limit, as a large pack on a slow line is: kept whole
+        let url = trickled(Duration::from_millis(600), 4, Duration::ZERO);
+        let root = scratch("slow");
+        let file = root.join("p.qwcpack");
+        let want: String = Sha256::digest([7u8; 4000]).iter().map(|b| format!("{b:02x}")).collect();
+        let got =
+            fetch_with(&file_agent(Duration::from_secs(1)), &url, &file, Some(4000), Some(&want), &Progress::default());
+        assert_eq!(got, Ok((want, 4000)));
+        assert_eq!(std::fs::metadata(&file).unwrap().len(), 4000);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_stalled_download_fails() {
+        // a quarter sent, then nothing: given up after the idle limit, nothing kept
+        let url = trickled(Duration::ZERO, 1, Duration::from_secs(10));
+        let root = scratch("stalled");
+        let file = root.join("p.qwcpack");
+        let start = std::time::Instant::now();
+        let got = fetch_with(&file_agent(Duration::from_secs(1)), &url, &file, Some(4000), None, &Progress::default());
+        assert!(got.is_err(), "{got:?}");
+        assert!(start.elapsed() < Duration::from_secs(5), "{:?}", start.elapsed());
+        assert!(!file.exists() && !root.join("p.qwcpack.part").exists());
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

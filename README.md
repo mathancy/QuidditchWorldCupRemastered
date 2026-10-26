@@ -5,8 +5,8 @@
 <h1 align="center">Quidditch World Cup Remastered</h1>
 
 <p align="center">
-  <i>Quidditch World Cup Remastered</i> is an unofficial, community-developed modding platform<br>
-  and modern runtime for the original 2003 PC game.
+  An unofficial, community-developed remaster of <i>Harry Potter: Quidditch World Cup</i> (EA, 2003):<br>
+  the original reverse-engineered and rebuilt in Rust, modernised, and opened up as a modding platform.
 </p>
 
 > [!WARNING]
@@ -23,37 +23,49 @@
 > version, and your own no-CD (unwrapped) `QWC.exe`, because the remaster cannot read the copy-protected retail
 > one. We don't distribute copyrighted files and won't link to them, so please don't ask.
 >
-> **The project is not a standalone game.** The platform provides a Rust-based runtime, launcher, resource-pack
-> management and modding tools. It does not include the original game's textures, models, animations, audio,
-> cinematics or other proprietary game assets. To play, users **must** supply their own installation of the
-> original PC game. The launcher imports the required files locally, and the runtime uses those files to
-> render and operate the game.
-> 
-> **Without the original game assets, the platform cannot provide a playable game.** The project is intended to
-> extend and modernise an existing installation, providing new rendering capabilities, mod support, and
-> quality-of-life improvements without redistributing the original game's content.
+> **This is not a standalone game.** The project provides a runtime, a launcher, resource-pack management and
+> modding tools. It includes none of the original's textures, models, animations, audio, cinematics or other
+> assets: the launcher imports the files it needs from your installation, on your computer, and the runtime plays
+> from them. Without the original game there is nothing to play.
 >
-> This is an independent fan project and is not affiliated with or endorsed by Electronic Arts, Warner Bros. or
-> the Harry Potter rights holders.
+> This is an independent fan project, not affiliated with or endorsed by Electronic Arts, Warner Bros. or the
+> Harry Potter rights holders.
 
 ![The launcher](.github/assets/launcher.jpg)
 
 ## What this is
 
-Quidditch World Cup never got a modern release, and its file formats were never documented. This project works
-through the original PC game, its data files and its program code, to find out exactly how everything works,
-then rebuilds it in modern code: a decompilation of the game, translated to [Rust](https://www.rust-lang.org/).
+Quidditch World Cup never got a modern release, and its file formats were never documented. This project is a
+remaster in the full sense: it finds out exactly how the original works, then rebuilds it, fixing what was broken,
+replacing what has aged and filling the gaps the original left. The new engine is written in
+[Rust](https://www.rust-lang.org/) and runs from the files of your own copy of the game.
 
-The aim is faithful first. The new engine loads the original files from your copy of the game and plays the way the
-original did: the same rules, the same AI, the same menus. On top of that it is built to be modded: every texture,
-model, animation, movie, font, menu layout, HUD element, shader and gameplay setting can be replaced or tuned by a
-**resource pack**, without touching the original files.
+The work is in three stages. They overlap: each one builds on the last, and none of them is finished.
 
-### It's a modding tool
+### 1. Reverse engineering (in progress)
 
-The remaster is, in essence, a modding tool. It ships no game content of its own: it is an engine that runs the
-game you already own, a launcher that manages it, and the tools to make packs for it. Everything you see in a match
-comes from your copy of the game, or from packs you choose to install.
+Analyse the original executable, understand its systems and reconstruct the game's behaviour in Rust: the file
+formats, the rules, the AI, the menus, the cameras. Knowing exactly what the original does is the foundation for
+everything else, because it lets us change things on purpose rather than by accident. This is where most of the
+work is today.
+
+### 2. Modernisation (underway)
+
+Replace outdated rendering, improve performance, fix bugs, rewrite awkward systems and add what a game made today
+would have. Some of this is already in, though still a work in progress: the rendering pipeline is new and very
+different from the original's (lighting with shadows, fog and colour grading per stadium, on Vulkan, Direct3D 12
+or Metal), and there is online play, which the original never had. Vector fonts, wide-screen menus and gamepads
+are in too.
+
+### 3. Modding platform (foundations laid)
+
+Make the game's systems configurable and extensible, so that packs can bring entirely new behaviour, gameplay
+changes and community-made content, not only new looks. The groundwork is there: **resource packs** already
+replace textures, models, animations, movies, fonts, menu layouts, the HUD and shaders, and tune gameplay
+settings, all without touching the original files. QWC Studio builds them and the pack store shares them.
+
+A faithful reconstruction is where the remaster starts, not where it stops: we find what's broken and rebuild it,
+and lay new ground where the original left gaps.
 
 ### Made with AI
 

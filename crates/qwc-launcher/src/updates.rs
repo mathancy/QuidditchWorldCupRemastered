@@ -198,12 +198,20 @@ pub(crate) fn fetch_checked(
     url: &str,
     file: &Path,
     size: Option<u64>,
-    sha256: &str,
+    sha256: Option<&str>,
     progress: &Progress,
-) -> Result<(), String> {
+) -> Result<(String, u64), String> {
     let name = file.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned());
     let part = file.with_file_name(format!("{name}.part"));
     let mut res = agent().get(url).call().map_err(|e| e.to_string())?;
+    // a share link that answers with its page (a sign-in, a quota or virus-scan notice), not the file
+    let kind = res.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_ascii_lowercase();
+    if kind.starts_with("text/html") {
+        return Err(format!(
+            "{name}: the link gave a web page, not the file (is it shared with anyone who has the link? Google Drive \
+             also refuses a file downloaded too often, for a day)"
+        ));
+    }
     progress.total.store(size.or_else(|| res.body().content_length()).unwrap_or(0), Ordering::Relaxed);
     progress.done.store(0, Ordering::Relaxed);
     let mut body = res.body_mut().with_config().limit(4 << 30).reader();
@@ -239,11 +247,12 @@ pub(crate) fn fetch_checked(
         return failed(out, format!("{name} is {written} bytes, not the {s} expected: not installed"));
     }
     let got: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
-    if !got.eq_ignore_ascii_case(sha256) {
+    if sha256.is_some_and(|want| !got.eq_ignore_ascii_case(want)) {
         return failed(out, format!("{name} does not match its checksum: not installed"));
     }
     drop(out);
-    std::fs::rename(&part, file).map_err(|e| format!("{}: {e}", file.display()))
+    std::fs::rename(&part, file).map_err(|e| format!("{}: {e}", file.display()))?;
+    Ok((got, written))
 }
 
 /// The releases, fetched.
@@ -272,7 +281,7 @@ pub fn download(release: &Release, dir: &Path, progress: &Progress) -> Result<Pa
         checksums(&text).remove(&asset.name).ok_or_else(|| format!("SHA256SUMS does not list {}", asset.name))?;
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let file = dir.join(&asset.name);
-    fetch_checked(&asset.url, &file, Some(asset.size), &want, progress)?;
+    fetch_checked(&asset.url, &file, Some(asset.size), Some(&want), progress)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

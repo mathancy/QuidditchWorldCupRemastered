@@ -148,6 +148,55 @@ pub fn allowed(url: &str) -> bool {
     url.starts_with("https://") || local.iter().any(|l| url.starts_with(l))
 }
 
+/// The address that gives the file itself for an author's share link: OneDrive's links through its sharing API
+/// (`api.onedrive.com/v1.0/shares/u!<the link>/root/content`, which forwards to the file), a business OneDrive or
+/// SharePoint link with `download=1`, a Google Drive file's direct download (`drive.usercontent.google.com`, past
+/// its virus-scan page for large files); every other link as it is. The store keeps the author's own link.
+pub fn direct(url: &str) -> String {
+    let host = url.trim_start_matches("https://").split(['/', '?']).next().unwrap_or("").to_ascii_lowercase();
+    if host == "1drv.ms" || host == "onedrive.live.com" {
+        return format!(
+            "https://api.onedrive.com/v1.0/shares/u!{}/root/content",
+            crate::account::b64url(url.as_bytes())
+        );
+    }
+    if host.ends_with(".sharepoint.com") && !url.contains("download=1") {
+        return format!("{url}{}download=1", if url.contains('?') { '&' } else { '?' });
+    }
+    if host == "drive.google.com" || host == "drive.usercontent.google.com" {
+        if let Some(id) = google_drive_id(url) {
+            return format!("https://drive.usercontent.google.com/download?id={id}&export=download&confirm=t");
+        }
+    }
+    url.to_string()
+}
+
+/// Download `link` as the store's installs do (made direct first) into `dir`, nothing expected: the address used,
+/// and the file's SHA-256 and size. The file is deleted. What `qwc-launcher check-link` prints, for authors.
+pub fn check_link(link: &str, dir: &Path) -> Result<(String, String, u64), String> {
+    if !allowed(link) {
+        return Err(format!("{link}: only https:// links are downloaded"));
+    }
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let file = dir.join("link-check.qwcpack");
+    let url = direct(link);
+    let got = crate::updates::fetch_checked(&url, &file, None, None, &Progress::default());
+    let _ = std::fs::remove_file(&file);
+    got.map(|(sha, size)| (url, sha, size))
+}
+
+/// A Google Drive file's id from its links: `/file/d/<id>/...`, or `?id=<id>` (`open`, `uc`, `download`).
+pub fn google_drive_id(url: &str) -> Option<String> {
+    let ok = |id: &str| id.len() >= 10 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+    if let Some(rest) = url.split("/file/d/").nth(1) {
+        let id = rest.split(['/', '?', '#']).next()?;
+        return ok(id).then(|| id.to_string());
+    }
+    let query = url.split_once('?')?.1;
+    let id = query.split('&').find_map(|kv| kv.strip_prefix("id="))?;
+    ok(id).then(|| id.to_string())
+}
+
 /// A pack version to install from the store: which, from where, and what the reviewed file was.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Target<'a> {
@@ -200,7 +249,8 @@ pub fn install_target(
     std::fs::create_dir_all(downloads).map_err(|e| format!("{}: {e}", downloads.display()))?;
     // the file named by the listing, not by the author's link
     let file = downloads.join(format!("store-{}.qwcpack", t.listing));
-    let fetched = crate::updates::fetch_checked(t.url, &file, Some(t.size), t.sha256, progress);
+    let fetched =
+        crate::updates::fetch_checked(&direct(t.url), &file, Some(t.size), Some(t.sha256), progress).map(|_| ());
     let installed = fetched.and_then(|()| {
         let m = qwc_packs::archive_manifest(&file)?;
         if (m.id.as_str(), m.version.as_str()) != (t.id, t.version) {
@@ -234,7 +284,7 @@ pub fn check_submission(t: &Target<'_>, downloads: &Path, progress: &Progress) -
     }
     std::fs::create_dir_all(downloads).map_err(|e| format!("{}: {e}", downloads.display()))?;
     let file = downloads.join(format!("review-{}.qwcpack", t.listing));
-    crate::updates::fetch_checked(t.url, &file, Some(t.size), t.sha256, progress)?;
+    crate::updates::fetch_checked(&direct(t.url), &file, Some(t.size), Some(t.sha256), progress)?;
     let manifest = qwc_packs::archive_manifest(&file)?;
     if (manifest.id.as_str(), manifest.version.as_str()) != (t.id, t.version) {
         return Err(format!(
@@ -582,6 +632,50 @@ mod tests {
             "https://store.test/packs?sort=rating&page=2&q=night%20%26%20day&kind=Visual"
         );
         assert_eq!(page_url("https://store.test", &Query::default()), "https://store.test/packs?sort=new&page=1");
+    }
+
+    #[test]
+    fn a_web_page_is_not_the_file() {
+        // a share link answering with its page (Google Drive's quota notice, a sign-in): refused, nothing kept
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://127.0.0.1:{}/p.qwcpack", listener.local_addr().unwrap().port());
+        std::thread::spawn(move || {
+            let (mut s, _) = listener.accept().unwrap();
+            let _ = s.read(&mut [0u8; 4096]);
+            let page = "<html>Too many users have viewed or downloaded this file recently.</html>";
+            let head = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\n\r\n",
+                page.len()
+            );
+            let _ = s.write_all(head.as_bytes());
+            let _ = s.write_all(page.as_bytes());
+        });
+        let root = scratch("page");
+        let file = root.join("p.qwcpack");
+        let e = crate::updates::fetch_checked(&url, &file, Some(10), Some(&"0".repeat(64)), &Progress::default())
+            .unwrap_err();
+        assert!(e.contains("web page"), "{e}");
+        assert!(!file.exists() && !root.join("p.qwcpack.part").exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn share_links_made_direct() {
+        let od = "https://1drv.ms/u/s!AbCdEf123?e=xyz";
+        assert_eq!(
+            direct(od),
+            format!("https://api.onedrive.com/v1.0/shares/u!{}/root/content", crate::account::b64url(od.as_bytes()))
+        );
+        assert!(direct("https://onedrive.live.com/?cid=1&id=2").starts_with("https://api.onedrive.com/v1.0/shares/u!"));
+        assert_eq!(direct("https://me.sharepoint.com/:u:/g/x?e=1"), "https://me.sharepoint.com/:u:/g/x?e=1&download=1");
+        assert_eq!(direct("https://me-my.sharepoint.com/:u:/g/x"), "https://me-my.sharepoint.com/:u:/g/x?download=1");
+        let gd = "https://drive.usercontent.google.com/download?id=1AbCdEfGhIjK_lm-n&export=download&confirm=t";
+        assert_eq!(direct("https://drive.google.com/file/d/1AbCdEfGhIjK_lm-n/view?usp=sharing"), gd);
+        assert_eq!(direct("https://drive.google.com/open?id=1AbCdEfGhIjK_lm-n"), gd);
+        assert_eq!(direct("https://drive.google.com/uc?export=download&id=1AbCdEfGhIjK_lm-n"), gd);
+        assert_eq!(google_drive_id("https://drive.google.com/drive/folders/abc"), None);
+        let gh = "https://github.com/a/b/releases/download/v1/p.qwcpack";
+        assert_eq!(direct(gh), gh);
     }
 
     #[test]

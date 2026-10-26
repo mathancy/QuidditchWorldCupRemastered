@@ -112,7 +112,7 @@ fn bearer(token: &str) -> String {
 }
 
 /// `bytes` as base64url without padding.
-fn b64url(bytes: &[u8]) -> String {
+pub(crate) fn b64url(bytes: &[u8]) -> String {
     const A: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     let mut s = String::with_capacity(bytes.len() * 4 / 3 + 2);
     for c in bytes.chunks(3) {
@@ -1168,8 +1168,14 @@ mod tests {
         let url = format!("http://127.0.0.1:8790/sam.lanterns-{version}.qwcpack");
         // the dialog's check: the link gives this very file
         let check = std::env::temp_dir().join(format!("qwc-submit-check-{}.qwcpack", std::process::id()));
-        crate::updates::fetch_checked(&url, &check, Some(pack.size), &pack.sha256, &crate::setup::Progress::default())
-            .unwrap();
+        crate::updates::fetch_checked(
+            &url,
+            &check,
+            Some(pack.size),
+            Some(&pack.sha256),
+            &crate::setup::Progress::default(),
+        )
+        .unwrap();
         let _ = std::fs::remove_file(&check);
         let mine = submit(&base, &token, &pack, &url, "Paper lanterns over the stands.", &[]).unwrap();
         assert!(my_submissions(&base, &token).unwrap().iter().any(|s| s.listing == mine && s.status == "pending"));

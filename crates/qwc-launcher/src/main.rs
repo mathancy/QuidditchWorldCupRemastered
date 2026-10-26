@@ -5,7 +5,9 @@
 //! - `import EXE DIR`: both checked, then imported into the library (`$QWC_LIBRARY` elsewhere) and the profile
 //!   pointed at them;
 //! - `hashes DIR ID NAME`: an edition list of a game folder (`editions/*.txt`), printed;
-//! - `check-updates`: the releases (`$QWC_RELEASES_URL` elsewhere) and whether one is newer.
+//! - `check-updates`: the releases (`$QWC_RELEASES_URL` elsewhere) and whether one is newer;
+//! - `check-link LINK`: a pack's download link fetched as the store's installs do (a OneDrive or Google Drive share
+//!   link made direct): the address used, and the file's size and SHA-256.
 
 // in a release build on Windows the launcher has no console window (its commands print to the one it was started
 // from, if any)
@@ -18,7 +20,7 @@ use std::path::Path;
 use qwc_launcher::setup::{self, Progress};
 
 const USAGE: &str =
-    "qwc-launcher [check-exe FILE | check-game DIR | import EXE DIR | hashes DIR ID NAME | check-updates]";
+    "qwc-launcher [check-exe FILE | check-game DIR | import EXE DIR | hashes DIR ID NAME | check-updates | check-link LINK]";
 
 /// A release build on Windows has no console of its own: started from one (a terminal, `studio.cmd`), it writes its
 /// messages there.
@@ -79,6 +81,18 @@ fn main() {
             println!("edition {id} {}", name.join(" "));
             for (path, sha) in files {
                 println!("{sha} {path}");
+            }
+        }
+        ["check-link", link] => {
+            let dir = std::env::temp_dir().join(format!("qwc-check-link-{}", std::process::id()));
+            let got = qwc_launcher::store::check_link(link, &dir);
+            let _ = std::fs::remove_dir_all(&dir);
+            match got {
+                Ok((url, sha, size)) => {
+                    println!("fetched {url}");
+                    println!("{size} bytes, sha256 {sha}");
+                }
+                Err(e) => fail(e),
             }
         }
         ["check-updates"] => {

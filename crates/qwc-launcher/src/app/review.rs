@@ -323,8 +323,9 @@ impl Launcher {
             ui.label(
                 RichText::new(
                     "The store lists packs that authors host themselves. Build the .qwcpack in QWC Studio, upload it as \
-                     a release on GitHub, GitLab or Codeberg (or to Dropbox), then give its download link here. A \
-                     reviewer checks it before it is listed.",
+                     a release on GitHub, GitLab or Codeberg, or share it from OneDrive, Google Drive or Dropbox (anyone \
+                     with the link can view), then give the link here. A reviewer checks it before it is listed. Google \
+                     Drive refuses a file that is downloaded too often for a day, so a release is the steadiest home.",
                 )
                 .small()
                 .color(style::DIM),
@@ -405,7 +406,7 @@ impl Launcher {
                             // the link must give this very file, as a reviewer's and players' launchers will check
                             let file = dir.join("check.qwcpack");
                             let _ = std::fs::create_dir_all(&dir);
-                            let fetched = crate::updates::fetch_checked(&url, &file, Some(p.size), &p.sha256, progress);
+                            let fetched = crate::updates::fetch_checked(&store::direct(&url), &file, Some(p.size), Some(&p.sha256), progress);
                             let _ = std::fs::remove_dir_all(&dir);
                             fetched.map_err(|e| format!("The link doesn't give this file: {e}"))?;
                             account::submit(&base, &token, &p, &url, &description, &shots).map_err(String::from)
@@ -671,9 +672,13 @@ impl Launcher {
                 }
             }
             // the decision
-            if own {
+            // a reviewer's own pack waits for another reviewer; an admin may review their own (the store logs it)
+            if own && me.role != "admin" {
                 ui.label(RichText::new("Your own pack: another reviewer reviews it.").color(style::DIM));
                 return;
+            }
+            if own {
+                ui.label(RichText::new("Your own pack: as the admin you may review it yourself.").color(style::WARN));
             }
             let note = self.review_view.notes.entry(p.listing).or_default();
             let l = ui.label("Note for the author (needed to reject)");

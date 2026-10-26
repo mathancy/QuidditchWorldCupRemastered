@@ -13,6 +13,16 @@
 > **This project is VERY much a work in progress.** Expect missing features, bugs, crashes and big changes
 > between versions. Save files and packs made today may not work with later releases.
 >
+> **Resource packs (the remastered textures, models, movies and layouts) are not publicly available yet.** The
+> releases contain the engine, the launcher and the modding tools only. Out of the box the game plays as the
+> original, drawn from your own copy of it.
+
+> [!IMPORTANT]
+> **You need your own copy of the game.** This repository and its releases contain **no** game files: no models,
+> textures, sounds, movies, text or executable from the original. You provide your own installation of the PC
+> version, and your own no-CD (unwrapped) `QWC.exe`, because the remaster cannot read the copy-protected retail
+> one. We don't distribute copyrighted files and won't link to them, so please don't ask.
+>
 > **The project is not a standalone game.** The platform provides a Rust-based runtime, launcher, resource-pack
 > management and modding tools. It does not include the original game's textures, models, animations, audio,
 > cinematics or other proprietary game assets. To play, users **must** supply their own installation of the
@@ -25,16 +35,6 @@
 >
 > This is an independent fan project and is not affiliated with or endorsed by Electronic Arts, Warner Bros. or
 > the Harry Potter rights holders.
->
-> **Resource packs (the remastered textures, models, movies and layouts) are not publicly available yet.** The
-> releases contain the engine, the launcher and the modding tools only. Out of the box the game plays as the
-> original, drawn from your own copy of it.
-
-> [!IMPORTANT]
-> **You need your own copy of the game.** This repository and its releases contain **no** game files: no models,
-> textures, sounds, movies, text or executable from the original. You provide your own installation of the PC
-> version, and your own no-CD (unwrapped) `QWC.exe`, because the remaster cannot read the copy-protected retail
-> one. We don't distribute copyrighted files and won't link to them, so please don't ask.
 
 ![The launcher](.github/assets/launcher.jpg)
 

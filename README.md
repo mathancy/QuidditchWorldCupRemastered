@@ -12,10 +12,6 @@
 > [!WARNING]
 > **This project is VERY much a work in progress.** Expect missing features, bugs, crashes and big changes
 > between versions. Save files and packs made today may not work with later releases.
->
-> **Resource packs (the remastered textures, models, movies and layouts) are not publicly available yet.** The
-> releases contain the engine, the launcher and the modding tools only. Out of the box the game plays as the
-> original, drawn from your own copy of it.
 
 > [!IMPORTANT]
 > **You need your own copy of the game.** This repository and its releases contain **no** game files: no models,
